@@ -93,11 +93,13 @@ app.get('/api/tasks/queue', (req, res) => {
     // Pick up in-progress tasks that were triggered by "Run Now" but not yet executed
     if (t.status === 'in-progress' && !t.pickedUp) return true;
     if (t.status !== 'todo') return false;
+    // All todo tasks are eligible — if it's in todo, execute it
+    if (!t.schedule) return true;
     if (t.schedule === 'asap' || t.schedule === 'next-heartbeat') return true;
-    if (t.schedule && t.schedule !== 'asap' && t.schedule !== 'next-heartbeat') {
+    if (t.schedule !== 'asap' && t.schedule !== 'next-heartbeat') {
       return new Date(t.schedule) <= now;
     }
-    return false;
+    return true;
   });
   queue.sort((a, b) => {
     const pa = PRIORITY_ORDER[a.priority] ?? 2;
