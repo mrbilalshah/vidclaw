@@ -1,0 +1,21 @@
+import React, { useState } from 'react'
+import Layout from './components/Layout'
+import Board from './components/Kanban/Board'
+import CalendarView from './components/Calendar/CalendarView'
+import FileBrowser from './components/Content/FileBrowser'
+import SkillsManager from './components/Skills/SkillsManager'
+import SoulEditor from './components/Soul/SoulEditor'
+
+export default function App() {
+  const [page, setPage] = useState('kanban')
+
+  return (
+    <Layout page={page} setPage={setPage}>
+      {page === 'kanban' && <Board />}
+      {page === 'calendar' && <CalendarView />}
+      {page === 'files' && <FileBrowser />}
+      {page === 'skills' && <SkillsManager />}
+      {page === 'soul' && <SoulEditor />}
+    </Layout>
+  )
+}
