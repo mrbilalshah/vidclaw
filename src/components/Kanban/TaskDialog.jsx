@@ -208,7 +208,7 @@ export default function TaskDialog({ open, onClose, onSave, task }) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-[320px]">
           {activeTab === 'form' ? (
             <div className="p-5 space-y-4">
               <div>
