@@ -2,16 +2,27 @@ import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
-import { GripVertical, Pencil, Trash2, Play, AlertCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { useTimezone } from '../TimezoneContext'
+import { GripVertical, Pencil, Trash2, Play, AlertCircle, ChevronDown, ChevronUp, Loader2, FileText } from 'lucide-react'
 
-function formatTime(iso) {
+function formatTime(iso, tz) {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+  return d.toLocaleDateString('en-US', { timeZone: tz, month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', second: '2-digit' })
+}
+
+// Extract file paths from task result text
+function extractFilePaths(text) {
+  if (!text) return []
+  const pathRegex = /(?:\/[\w.\-]+)+(?:\.[\w]+)?/g
+  const matches = text.match(pathRegex) || []
+  // Filter to likely file paths (must have an extension or be in a known directory)
+  return [...new Set(matches.filter(p => /\.\w+$/.test(p) || p.includes('/workspace/')))]
 }
 
 export default function TaskCard({ task, onEdit, onDelete, onRun, isDragging: isDraggingProp }) {
   const [expanded, setExpanded] = useState(false)
+  const { timezone } = useTimezone()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
 
   const style = {
@@ -86,12 +97,12 @@ export default function TaskCard({ task, onEdit, onDelete, onRun, isDragging: is
       </div>
 
       {isInProgress && task.startedAt && (
-        <p className="text-[10px] text-muted-foreground mt-1.5">Started {formatTime(task.startedAt)}</p>
+        <p className="text-[10px] text-muted-foreground mt-1.5">Started {formatTime(task.startedAt, timezone)}</p>
       )}
 
       {isDone && (
         <div className="mt-1.5 space-y-1">
-          {task.completedAt && <p className="text-[10px] text-muted-foreground">Completed {formatTime(task.completedAt)}</p>}
+          {task.completedAt && <p className="text-[10px] text-muted-foreground">Completed {formatTime(task.completedAt, timezone)}</p>}
           {(task.result || task.error) && (
             <div onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
               <button
@@ -102,12 +113,25 @@ export default function TaskCard({ task, onEdit, onDelete, onRun, isDragging: is
                 {task.error ? 'Error Details' : 'Result'}
               </button>
               {expanded && (
-                <pre className={cn(
-                  'mt-1 text-[10px] font-mono p-2 rounded-md max-h-32 overflow-auto',
-                  task.error ? 'bg-red-500/10 text-red-300' : 'bg-secondary text-muted-foreground'
-                )}>
-                  {task.error || task.result}
-                </pre>
+                <>
+                  <pre className={cn(
+                    'mt-1 text-[10px] font-mono p-2 rounded-md max-h-32 overflow-auto',
+                    task.error ? 'bg-red-500/10 text-red-300' : 'bg-secondary text-muted-foreground'
+                  )}>
+                    {task.error || task.result}
+                  </pre>
+                  {extractFilePaths(task.result).length > 0 && (
+                    <div className="mt-1.5 space-y-0.5">
+                      <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-medium">Files</span>
+                      {extractFilePaths(task.result).map((fp, i) => (
+                        <div key={i} className="flex items-center gap-1 text-[10px] text-blue-400 font-mono">
+                          <FileText size={9} className="shrink-0" />
+                          <span className="truncate" title={fp}>{fp}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

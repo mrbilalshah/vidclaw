@@ -5,3 +5,4 @@ data/heartbeat.json
 data/soul-history.json
 data/*-history.json
 *.log
+settings.local.json

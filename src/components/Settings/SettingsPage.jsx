@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { Settings, Clock, Save, Check, Loader2 } from 'lucide-react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { Settings, Clock, Globe, Save, Check, Loader2, Search, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTimezone } from '../TimezoneContext'
 
 const HEARTBEAT_OPTIONS = [
   { value: '5m', label: '5 minutes' },
@@ -10,15 +11,109 @@ const HEARTBEAT_OPTIONS = [
   { value: '1h', label: '1 hour' },
 ]
 
+const ALL_TIMEZONES = Intl.supportedValuesOf('timeZone')
+
+function TimezoneCombobox({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const inputRef = useRef(null)
+  const listRef = useRef(null)
+  const containerRef = useRef(null)
+
+  const filtered = useMemo(() => {
+    if (!query) return ALL_TIMEZONES
+    const q = query.toLowerCase()
+    return ALL_TIMEZONES.filter(tz => tz.toLowerCase().includes(q))
+  }, [query])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Scroll selected into view when opening
+  useEffect(() => {
+    if (open && listRef.current) {
+      const selected = listRef.current.querySelector('[data-selected="true"]')
+      if (selected) selected.scrollIntoView({ block: 'nearest' })
+    }
+  }, [open])
+
+  const handleSelect = (tz) => {
+    onChange(tz)
+    setOpen(false)
+    setQuery('')
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen(!open); if (!open) setTimeout(() => inputRef.current?.focus(), 0) }}
+        className="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground hover:border-primary/50 transition-colors"
+      >
+        <span>{value}</span>
+        <ChevronDown size={14} className={cn('text-muted-foreground transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-card shadow-lg">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+            <Search size={14} className="text-muted-foreground shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search timezones…"
+              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+            />
+          </div>
+          <ul ref={listRef} className="max-h-48 overflow-auto py-1">
+            {filtered.length === 0 && (
+              <li className="px-3 py-2 text-xs text-muted-foreground">No timezones found</li>
+            )}
+            {filtered.map(tz => (
+              <li
+                key={tz}
+                data-selected={tz === value}
+                onClick={() => handleSelect(tz)}
+                className={cn(
+                  'px-3 py-1.5 text-sm cursor-pointer transition-colors',
+                  tz === value
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-foreground hover:bg-accent'
+                )}
+              >
+                {tz}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [heartbeat, setHeartbeat] = useState('30m')
   const [savedHeartbeat, setSavedHeartbeat] = useState('30m')
+  const [timezone, setTimezoneLocal] = useState('UTC')
+  const [savedTimezone, setSavedTimezone] = useState('UTC')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [restarted, setRestarted] = useState(false)
   const [error, setError] = useState(null)
+  const { setTimezone: setGlobalTimezone } = useTimezone()
 
-  const isDirty = heartbeat !== savedHeartbeat
+  const isDirty = heartbeat !== savedHeartbeat || timezone !== savedTimezone
 
   useEffect(() => {
     fetch('/api/settings')
@@ -26,6 +121,9 @@ export default function SettingsPage() {
       .then(d => {
         setHeartbeat(d.heartbeatEvery || '30m')
         setSavedHeartbeat(d.heartbeatEvery || '30m')
+        const tz = d.timezone || 'UTC'
+        setTimezoneLocal(tz)
+        setSavedTimezone(tz)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -38,12 +136,19 @@ export default function SettingsPage() {
       const r = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ heartbeatEvery: heartbeat }),
+        body: JSON.stringify({ heartbeatEvery: heartbeat, timezone }),
       })
-      if (!r.ok) throw new Error('Save failed')
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}))
+        throw new Error(data.error || 'Save failed')
+      }
+      const data = await r.json()
       setSavedHeartbeat(heartbeat)
+      setSavedTimezone(timezone)
+      setGlobalTimezone(timezone)
       setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      setRestarted(!!data.restarted)
+      setTimeout(() => { setSaved(false); setRestarted(false) }, 2000)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -93,6 +198,18 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Timezone Section */}
+      <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Globe size={16} className="text-blue-400" />
+          <h3 className="font-medium text-sm">Timezone</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Used for the clock display, calendar dates, and task timestamps. No restart needed.
+        </p>
+        <TimezoneCombobox value={timezone} onChange={setTimezoneLocal} />
+      </div>
+
       {/* Save */}
       {error && (
         <p className="text-sm text-red-400">{error}</p>
@@ -109,10 +226,13 @@ export default function SettingsPage() {
           )}
         >
           {saving ? <Loader2 className="animate-spin" size={14} /> : saved ? <Check size={14} /> : <Save size={14} />}
-          {saving ? 'Saving…' : saved ? 'Saved & Restarting' : 'Save'}
+          {saving ? 'Saving…' : saved ? (restarted ? 'Saved & Restarting' : 'Saved') : 'Save'}
         </button>
-        {saved && (
+        {saved && restarted && (
           <span className="text-xs text-green-400">OpenClaw is restarting with new settings…</span>
+        )}
+        {saved && !restarted && (
+          <span className="text-xs text-green-400">Settings saved.</span>
         )}
       </div>
     </div>

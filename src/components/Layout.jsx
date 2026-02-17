@@ -92,7 +92,9 @@ export default function Layout({ page, setPage, children }) {
             </button>
             <span className="text-sm font-medium capitalize">{page === 'kanban' ? 'Task Board' : page === 'calendar' ? 'Activity Calendar' : page === 'skills' ? 'Skills Manager' : page === 'soul' ? 'Soul Editor' : page === 'settings' ? 'Settings' : 'Content Browser'}</span>
           </div>
-          <UsageWidget />
+          <div className="flex items-center gap-4">
+            <UsageWidget />
+          </div>
         </header>
         <main className="flex-1 overflow-auto p-2 sm:p-4">
           {children}

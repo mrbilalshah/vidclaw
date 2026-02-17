@@ -2,19 +2,82 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = 3333;
+const PORT = 3334;
 const TASKS_FILE = path.join(__dirname, 'data', 'tasks.json');
-const WORKSPACE = '/root/.openclaw/workspace';
+const HOME = os.homedir();
+const OPENCLAW_DIR = process.env.OPENCLAW_DIR || path.join(HOME, '.openclaw');
+const WORKSPACE = path.join(OPENCLAW_DIR, 'workspace');
+function getTimezone() {
+  try {
+    const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
+    return config.agents?.defaults?.timezone || 'UTC';
+  } catch { return 'UTC'; }
+}
+const OPENCLAW_API_BASE = process.env.OPENCLAW_API || 'http://127.0.0.1:18789';
+
+// --- Timezone Helpers ---
+// Get date/time parts in the configured timezone
+function getDatePartsInTz(date = new Date(), tz = getTimezone()) {
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+    weekday: 'long',
+  }).formatToParts(date).forEach(p => { parts[p.type] = p.value; });
+  return {
+    year: parseInt(parts.year),
+    month: parseInt(parts.month) - 1,
+    day: parseInt(parts.day),
+    hour: parts.hour === '24' ? 0 : parseInt(parts.hour),
+    minute: parseInt(parts.minute),
+    second: parseInt(parts.second),
+    weekday: parts.weekday,
+  };
+}
+
+// Get the UTC Date that corresponds to midnight (start of day) in the target timezone
+function startOfDayInTz(date = new Date(), tz = getTimezone()) {
+  const p = getDatePartsInTz(date, tz);
+  // Create a date string in the timezone and parse it
+  const localMidnight = `${p.year}-${String(p.month + 1).padStart(2, '0')}-${String(p.day).padStart(2, '0')}T00:00:00`;
+  // Calculate the offset by comparing local representation to UTC
+  const utcNow = date.getTime();
+  const localNow = new Date(p.year, p.month, p.day, p.hour, p.minute, p.second).getTime();
+  const offset = utcNow - localNow;
+  return new Date(new Date(p.year, p.month, p.day, 0, 0, 0, 0).getTime() + offset);
+}
+
+function startOfWeekInTz(date = new Date(), tz = getTimezone()) {
+  const p = getDatePartsInTz(date, tz);
+  const d = new Date(p.year, p.month, p.day);
+  const dayOfWeek = d.getDay(); // 0=Sunday
+  const weekStartLocal = new Date(p.year, p.month, p.day - dayOfWeek);
+  const utcNow = date.getTime();
+  const localNow = new Date(p.year, p.month, p.day, p.hour, p.minute, p.second).getTime();
+  const offset = utcNow - localNow;
+  return new Date(weekStartLocal.getTime() + offset);
+}
+
+function startOfMonthInTz(date = new Date(), tz = getTimezone()) {
+  const p = getDatePartsInTz(date, tz);
+  const utcNow = date.getTime();
+  const localNow = new Date(p.year, p.month, p.day, p.hour, p.minute, p.second).getTime();
+  const offset = utcNow - localNow;
+  return new Date(new Date(p.year, p.month, 1, 0, 0, 0, 0).getTime() + offset);
+}
 const SKILLS_DIRS = {
   bundled: '/usr/lib/node_modules/openclaw/skills',
-  managed: '/root/.openclaw/skills',
-  workspace: '/root/.openclaw/workspace/skills',
+  managed: path.join(OPENCLAW_DIR, 'skills'),
+  workspace: path.join(WORKSPACE, 'skills'),
 };
-const OPENCLAW_JSON = '/root/.openclaw/openclaw.json';
+const OPENCLAW_JSON = path.join(OPENCLAW_DIR, 'openclaw.json');
 
 app.use(cors());
 app.use(express.json());
@@ -189,18 +252,38 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Time API ---
+app.get('/api/time', (req, res) => {
+  const now = new Date();
+  const tz = getTimezone();
+  const p = getDatePartsInTz(now, tz);
+  res.json({
+    timezone: tz,
+    iso: now.toISOString(),
+    local: now.toLocaleString('en-US', { timeZone: tz }),
+    weekday: p.weekday,
+    year: p.year,
+    month: p.month + 1,
+    day: p.day,
+    hour: p.hour,
+    minute: p.minute,
+    second: p.second,
+  });
+});
+
 // --- Usage API ---
 app.get('/api/usage', (req, res) => {
   const now = new Date();
-  const sessionsDir = '/root/.openclaw/agents/main/sessions';
-  
+  const sessionsDir = path.join(OPENCLAW_DIR, 'agents', 'main', 'sessions');
+
   let tokensToday = 0, tokensWeek = 0, tokensMonth = 0;
   let costToday = 0, costWeek = 0, costMonth = 0;
   const sessionsToday = new Set(), sessionsWeek = new Set(), sessionsMonth = new Set();
-  
-  const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
-  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); weekStart.setHours(0,0,0,0);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const tz = getTimezone();
+  const todayStart = startOfDayInTz(now, tz);
+  const weekStart = startOfWeekInTz(now, tz);
+  const monthStart = startOfMonthInTz(now, tz);
   
   try {
     const files = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.jsonl'));
@@ -276,19 +359,81 @@ app.get('/api/usage', (req, res) => {
 
   res.json({
     model,
+    timezone: tz,
     tiers: [
       {
         label: 'Current session',
         percent: sessionPct,
         resetsIn: sessionResetIn,
+        tokens: tokensSession,
+        cost: costSession,
       },
       {
         label: 'Current week (all models)',
         percent: weeklyPct,
         resetsIn: formatDuration(nextWeekReset - now),
+        tokens: tokensWeek,
+        cost: costWeek,
       },
     ],
+    details: {
+      today: { tokens: tokensToday, cost: costToday, sessions: sessionsToday.size },
+      week: { tokens: tokensWeek, cost: costWeek, sessions: sessionsWeek.size },
+      month: { tokens: tokensMonth, cost: costMonth, sessions: sessionsMonth.size },
+    },
   });
+});
+
+// --- OpenClaw Proxy API ---
+// Helper: fetch from OpenClaw API, handling HTML responses gracefully
+async function fetchOpenclawJson(endpoint) {
+  const url = `${OPENCLAW_API_BASE}${endpoint}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`OpenClaw returned ${response.status}`);
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    // OpenClaw returned an HTML page, not a JSON API — skip it
+    throw new Error(`Endpoint ${endpoint} returns HTML (web page), not JSON API`);
+  }
+  return await response.json();
+}
+
+// Try multiple known OpenClaw API endpoints for usage data
+app.get('/api/openclaw/usage', async (req, res) => {
+  // Try common JSON API paths that OpenClaw might expose
+  const candidates = ['/api/usage', '/api/v1/usage', '/api/status', '/status'];
+  for (const ep of candidates) {
+    try {
+      const data = await fetchOpenclawJson(ep);
+      return res.json({ ...data, _source: ep });
+    } catch {}
+  }
+  // All candidates failed — report it cleanly
+  res.status(502).json({
+    error: 'No JSON usage API found on OpenClaw',
+    detail: `Tried ${candidates.join(', ')} on ${OPENCLAW_API_BASE}. The /usage endpoint returns HTML (a web page), not a JSON API.`,
+    hint: 'Usage data is still available from local session file scanning.',
+  });
+});
+
+app.get('/api/openclaw/status', async (req, res) => {
+  try {
+    const data = await fetchOpenclawJson('/api/status');
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not reach OpenClaw API', detail: e.message });
+  }
+});
+
+// Generic OpenClaw API proxy for any endpoint
+app.get('/api/openclaw/proxy/*', async (req, res) => {
+  const endpoint = '/' + req.params[0];
+  try {
+    const data = await fetchOpenclawJson(endpoint);
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not reach OpenClaw API', detail: e.message });
+  }
 });
 
 // --- Models API ---
@@ -482,6 +627,12 @@ app.get('/api/files/download', (req, res) => {
 });
 
 // --- Calendar API ---
+// Convert an ISO timestamp to a YYYY-MM-DD string in the configured timezone
+function isoToDateInTz(isoStr, tz = getTimezone()) {
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD format
+}
+
 app.get('/api/calendar', (req, res) => {
   const memoryDir = path.join(WORKSPACE, 'memory');
   const data = {};
@@ -496,7 +647,8 @@ app.get('/api/calendar', (req, res) => {
   const tasks = readTasks();
   for (const t of tasks) {
     if (t.completedAt) {
-      const date = t.completedAt.slice(0, 10);
+      // Convert UTC timestamp to local date in America/New_York
+      const date = isoToDateInTz(t.completedAt);
       data[date] = data[date] || { memory: false, tasks: [] };
       data[date].tasks.push(t.title);
     }
@@ -606,7 +758,8 @@ app.get('/api/settings', (req, res) => {
   try {
     const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
     const heartbeatEvery = config?.agents?.defaults?.heartbeat?.every || '30m';
-    res.json({ heartbeatEvery });
+    const timezone = config?.agents?.defaults?.timezone || 'UTC';
+    res.json({ heartbeatEvery, timezone });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -614,26 +767,52 @@ app.get('/api/settings', (req, res) => {
 
 app.post('/api/settings', async (req, res) => {
   try {
-    const { heartbeatEvery } = req.body;
-    const allowed = ['5m', '10m', '15m', '30m', '1h'];
-    if (!allowed.includes(heartbeatEvery)) return res.status(400).json({ error: 'Invalid value' });
+    const { heartbeatEvery, timezone } = req.body;
+
+    // Validate heartbeat
+    const allowedHeartbeats = ['5m', '10m', '15m', '30m', '1h'];
+    if (heartbeatEvery && !allowedHeartbeats.includes(heartbeatEvery)) {
+      return res.status(400).json({ error: 'Invalid heartbeat value' });
+    }
+
+    // Validate timezone
+    if (timezone) {
+      const valid = Intl.supportedValuesOf('timeZone');
+      if (!valid.includes(timezone)) {
+        return res.status(400).json({ error: 'Invalid timezone' });
+      }
+    }
 
     const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
     if (!config.agents) config.agents = {};
     if (!config.agents.defaults) config.agents.defaults = {};
-    if (!config.agents.defaults.heartbeat) config.agents.defaults.heartbeat = {};
-    config.agents.defaults.heartbeat.every = heartbeatEvery;
+
+    const heartbeatChanged = heartbeatEvery && heartbeatEvery !== config.agents.defaults.heartbeat?.every;
+
+    if (heartbeatEvery) {
+      if (!config.agents.defaults.heartbeat) config.agents.defaults.heartbeat = {};
+      config.agents.defaults.heartbeat.every = heartbeatEvery;
+    }
+    if (timezone) {
+      config.agents.defaults.timezone = timezone;
+    }
+
     fs.writeFileSync(OPENCLAW_JSON, JSON.stringify(config, null, 2));
 
-    logActivity('dashboard', 'settings_updated', { heartbeatEvery });
+    const details = {};
+    if (heartbeatEvery) details.heartbeatEvery = heartbeatEvery;
+    if (timezone) details.timezone = timezone;
+    logActivity('dashboard', 'settings_updated', details);
 
-    // Restart OpenClaw so new interval takes effect
-    const { exec: execCb } = await import('child_process');
-    execCb('openclaw gateway restart', (err) => {
-      if (err) console.error('Failed to restart openclaw:', err.message);
-    });
+    // Only restart OpenClaw when heartbeat changes
+    if (heartbeatChanged) {
+      const { exec: execCb } = await import('child_process');
+      execCb('openclaw gateway restart', (err) => {
+        if (err) console.error('Failed to restart openclaw:', err.message);
+      });
+    }
 
-    res.json({ ok: true });
+    res.json({ ok: true, restarted: !!heartbeatChanged });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

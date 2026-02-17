@@ -1,11 +1,32 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, FileText, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, CheckCircle, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTimezone } from '../TimezoneContext'
+
+function LiveClock({ timezone }) {
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const iv = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(iv)
+  }, [])
+  const timeStr = now.toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', minute: '2-digit', second: '2-digit' })
+  const dayStr = now.toLocaleDateString('en-US', { timeZone: timezone, weekday: 'long', month: 'short', day: 'numeric' })
+  const tzAbbr = now.toLocaleTimeString('en-US', { timeZone: timezone, timeZoneName: 'short' }).split(' ').pop()
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Clock size={14} className="text-orange-400" />
+      <span className="font-medium text-foreground">{dayStr}</span>
+      <span>{timeStr}</span>
+      <span className="text-xs">{tzAbbr}</span>
+    </div>
+  )
+}
 
 export default function CalendarView() {
   const [data, setData] = useState({})
   const [current, setCurrent] = useState(new Date())
   const [selected, setSelected] = useState(null)
+  const { timezone } = useTimezone()
 
   useEffect(() => {
     fetch('/api/calendar').then(r => r.json()).then(setData).catch(() => {})
@@ -15,7 +36,7 @@ export default function CalendarView() {
   const month = current.getMonth()
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: timezone })
 
   const days = []
   for (let i = 0; i < firstDay; i++) days.push(null)
@@ -29,6 +50,9 @@ export default function CalendarView() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
+      <div className="flex justify-end mb-2">
+        <LiveClock timezone={timezone} />
+      </div>
       <div className="flex items-center justify-between">
         <button onClick={() => setCurrent(new Date(year, month - 1))} className="p-2 hover:bg-accent rounded-md transition-colors">
           <ChevronLeft size={18} />
