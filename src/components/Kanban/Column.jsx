@@ -46,7 +46,7 @@ export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onDel
         </div>
         {column.id === 'todo' && <HeartbeatTimer />}
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]">
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {tasks.map(task => (
             <TaskCard key={task.id} task={task} onEdit={onEdit} onDelete={onDelete} onRun={onRun} />
