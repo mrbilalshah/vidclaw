@@ -4,6 +4,27 @@ set -e
 echo "⚡ VidClaw Setup"
 echo ""
 
+# Parse arguments
+TAILSCALE_ENABLED=false
+TAILSCALE_PORT=8443
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --tailscale)
+      TAILSCALE_ENABLED=true
+      if [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+        TAILSCALE_PORT="$2"
+        shift
+      fi
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
 # Detect workspace path
 DASHBOARD_DIR="$(cd "$(dirname "$0")" && pwd)"
 NODE_BIN=$(which node 2>/dev/null || echo "/usr/bin/node")
@@ -25,9 +46,54 @@ npm run build
 # Create data directory
 mkdir -p "$DASHBOARD_DIR/data"
 
-# Install systemd service
-echo "⚙️  Installing systemd service..."
-sudo tee /etc/systemd/system/vidclaw.service > /dev/null << EOF
+# Detect OS
+OS="$(uname -s)"
+
+if [ "$OS" = "Darwin" ]; then
+  # macOS: install launchd plist
+  echo "⚙️  Installing launchd service..."
+  PLIST_PATH="$HOME/Library/LaunchAgents/com.vidclaw.plist"
+  mkdir -p "$HOME/Library/LaunchAgents"
+  cat > "$PLIST_PATH" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.vidclaw</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$NODE_BIN</string>
+    <string>$DASHBOARD_DIR/server.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$DASHBOARD_DIR</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>$DASHBOARD_DIR/data/vidclaw.log</string>
+  <key>StandardErrorPath</key>
+  <string>$DASHBOARD_DIR/data/vidclaw.err</string>
+</dict>
+</plist>
+EOF
+
+  # Unload first if already loaded (ignore errors)
+  launchctl unload "$PLIST_PATH" 2>/dev/null || true
+  launchctl load "$PLIST_PATH"
+else
+  # Linux: install systemd service
+  echo "⚙️  Installing systemd service..."
+  sudo tee /etc/systemd/system/vidclaw.service > /dev/null << EOF
 [Unit]
 Description=VidClaw
 After=network.target
@@ -44,8 +110,9 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable --now vidclaw
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now vidclaw
+fi
 
 # Add task queue check to HEARTBEAT.md
 WORKSPACE_DIR="$(dirname "$DASHBOARD_DIR")"
@@ -74,7 +141,15 @@ echo ""
 echo "✅ Dashboard installed and running!"
 echo ""
 echo "   Local:  http://localhost:3333"
-echo "   Remote: ssh -L 3333:localhost:3333 $(whoami)@$(hostname -I | awk '{print $1}')"
-echo ""
-echo "   Manage: sudo systemctl {start|stop|restart|status} vidclaw"
-echo "   Logs:   journalctl -u vidclaw -f"
+
+if [ "$OS" = "Darwin" ]; then
+  echo "   Remote: ssh -L 3333:localhost:3333 $(whoami)@$(hostname | head -1)"
+  echo ""
+  echo "   Manage: launchctl {load|unload} $PLIST_PATH"
+  echo "   Logs:   tail -f $DASHBOARD_DIR/data/vidclaw.log"
+else
+  echo "   Remote: ssh -L 3333:localhost:3333 $(whoami)@$(hostname -I | awk '{print $1}')"
+  echo ""
+  echo "   Manage: sudo systemctl {start|stop|restart|status} vidclaw"
+  echo "   Logs:   journalctl -u vidclaw -f"
+fi
