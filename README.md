@@ -69,12 +69,18 @@ nvm install 22
 cd ~/.openclaw/workspace
 git clone https://github.com/madrzak/vidclaw.git dashboard
 
-# Run the setup script (installs deps, builds, sets up systemd)
+# Run the setup script (installs deps, builds, sets up systemd/launchd)
 cd dashboard
 ./setup.sh
+
+# Or with Tailscale Serve integration (optional, default port 8443)
+./setup.sh --tailscale
+./setup.sh --tailscale 9443  # custom port
 ```
 
-That's it. The setup script handles everything — npm install, frontend build, systemd service creation, and starts the dashboard automatically.
+That's it. The setup script handles everything — npm install, frontend build, service creation (systemd on Linux, launchd on macOS), and starts the dashboard automatically.
+
+When `--tailscale` is passed, the service is configured to register its Tailscale Serve route on every start, so the route survives OpenClaw gateway restarts with `resetOnExit: true`.
 
 Access via SSH tunnel:
 ```bash
