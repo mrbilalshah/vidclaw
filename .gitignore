@@ -6,3 +6,4 @@ data/soul-history.json
 data/*-history.json
 *.log
 settings.local.json
+/LOCAL.md
