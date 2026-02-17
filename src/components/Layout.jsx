@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import UsageWidget from './Usage/UsageWidget'
-import { LayoutDashboard, Calendar, FolderOpen, Puzzle, Heart, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Calendar, FolderOpen, Puzzle, Heart, Settings, Menu, X } from 'lucide-react'
 
 const navItems = [
   { id: 'kanban', label: 'Tasks', icon: LayoutDashboard },
@@ -9,6 +9,7 @@ const navItems = [
   { id: 'files', label: 'Files', icon: FolderOpen },
   { id: 'skills', label: 'Skills', icon: Puzzle },
   { id: 'soul', label: 'Soul', icon: Heart },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
 export default function Layout({ page, setPage, children }) {
@@ -89,7 +90,7 @@ export default function Layout({ page, setPage, children }) {
             >
               <Menu size={20} />
             </button>
-            <span className="text-sm font-medium capitalize">{page === 'kanban' ? 'Task Board' : page === 'calendar' ? 'Activity Calendar' : page === 'skills' ? 'Skills Manager' : page === 'soul' ? 'Soul Editor' : 'Content Browser'}</span>
+            <span className="text-sm font-medium capitalize">{page === 'kanban' ? 'Task Board' : page === 'calendar' ? 'Activity Calendar' : page === 'skills' ? 'Skills Manager' : page === 'soul' ? 'Soul Editor' : page === 'settings' ? 'Settings' : 'Content Browser'}</span>
           </div>
           <UsageWidget />
         </header>

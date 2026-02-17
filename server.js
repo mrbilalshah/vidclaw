@@ -22,6 +22,29 @@ app.use(express.json());
 // Serve static frontend
 app.use(express.static(path.join(__dirname, 'dist')));
 
+// --- Activity Log ---
+const ACTIVITY_FILE = path.join(__dirname, 'data', 'activity.json');
+
+function readActivity() {
+  try { return JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf-8')); } catch { return []; }
+}
+function writeActivity(log) {
+  // Keep last 200 entries
+  while (log.length > 200) log.shift();
+  fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(log, null, 2));
+}
+function logActivity(actor, action, details = {}) {
+  const log = readActivity();
+  log.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), actor, action, details, timestamp: new Date().toISOString() });
+  writeActivity(log);
+}
+
+app.get('/api/activity', (req, res) => {
+  const log = readActivity();
+  const limit = parseInt(req.query.limit) || 50;
+  res.json(log.slice(-limit).reverse());
+});
+
 // --- Tasks API ---
 function readTasks() {
   try {
@@ -55,6 +78,7 @@ app.post('/api/tasks', (req, res) => {
   };
   tasks.push(task);
   writeTasks(tasks);
+  logActivity('user', 'task_created', { taskId: task.id, title: task.title });
   res.json(task);
 });
 
@@ -70,6 +94,8 @@ app.put('/api/tasks/:id', (req, res) => {
   if (wasNotDone && tasks[idx].status === 'done') tasks[idx].completedAt = new Date().toISOString();
   if (tasks[idx].status !== 'done') tasks[idx].completedAt = null;
   writeTasks(tasks);
+  const actor = req.body._actor || 'user';
+  logActivity(actor, 'task_updated', { taskId: req.params.id, title: tasks[idx].title, changes: Object.keys(updates) });
   res.json(tasks[idx]);
 });
 
@@ -96,6 +122,7 @@ app.post('/api/tasks/:id/run', (req, res) => {
   tasks[idx].startedAt = new Date().toISOString();
   tasks[idx].updatedAt = new Date().toISOString();
   writeTasks(tasks);
+  logActivity('user', 'task_run', { taskId: req.params.id, title: tasks[idx].title });
   res.json({ success: true, message: 'Task queued for execution' });
 });
 
@@ -132,6 +159,7 @@ app.post('/api/tasks/:id/pickup', (req, res) => {
   tasks[idx].startedAt = tasks[idx].startedAt || new Date().toISOString();
   tasks[idx].updatedAt = new Date().toISOString();
   writeTasks(tasks);
+  logActivity('bot', 'task_pickup', { taskId: req.params.id, title: tasks[idx].title });
   res.json(tasks[idx]);
 });
 
@@ -145,13 +173,16 @@ app.post('/api/tasks/:id/complete', (req, res) => {
   tasks[idx].result = req.body.result || null;
   if (req.body.error) tasks[idx].error = req.body.error;
   writeTasks(tasks);
+  logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError: !!req.body.error });
   res.json(tasks[idx]);
 });
 
 app.delete('/api/tasks/:id', (req, res) => {
   let tasks = readTasks();
+  const deleted = tasks.find(t => t.id === req.params.id);
   tasks = tasks.filter(t => t.id !== req.params.id);
   writeTasks(tasks);
+  if (deleted) logActivity('user', 'task_deleted', { taskId: req.params.id, title: deleted.title });
   res.json({ ok: true });
 });
 
@@ -565,6 +596,44 @@ app.get('/api/workspace-file/history', (req, res) => {
   const name = req.query.name;
   if (!name || name.includes('/') || name.includes('..')) return res.status(400).json({ error: 'Invalid name' });
   res.json(readHistoryFile(path.join(__dirname, 'data', `${name}-history.json`)));
+});
+
+// --- Settings API ---
+app.get('/api/settings', (req, res) => {
+  try {
+    const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
+    const heartbeatEvery = config?.agents?.defaults?.heartbeat?.every || '30m';
+    res.json({ heartbeatEvery });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/settings', async (req, res) => {
+  try {
+    const { heartbeatEvery } = req.body;
+    const allowed = ['5m', '10m', '15m', '30m', '1h'];
+    if (!allowed.includes(heartbeatEvery)) return res.status(400).json({ error: 'Invalid value' });
+
+    const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
+    if (!config.agents) config.agents = {};
+    if (!config.agents.defaults) config.agents.defaults = {};
+    if (!config.agents.defaults.heartbeat) config.agents.defaults.heartbeat = {};
+    config.agents.defaults.heartbeat.every = heartbeatEvery;
+    fs.writeFileSync(OPENCLAW_JSON, JSON.stringify(config, null, 2));
+
+    logActivity('dashboard', 'settings_updated', { heartbeatEvery });
+
+    // Restart OpenClaw so new interval takes effect
+    const { exec: execCb } = await import('child_process');
+    execCb('openclaw gateway restart', (err) => {
+      if (err) console.error('Failed to restart openclaw:', err.message);
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // SPA fallback
