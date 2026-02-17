@@ -6,101 +6,161 @@ A secure, self-hosted command center for managing your OpenClaw AI agent.
 
 ## Features
 
-- **🗂️ Kanban Task Board** — Backlog → Todo → In Progress → Done. Drag & drop, priorities, skill assignment. Your agent picks up tasks automatically via heartbeat or cron.
-- **📊 Usage Tracking** — Real-time token usage and cost estimates parsed from session transcripts. Progress bars matching Anthropic's rate limit windows.
-- **🔄 Model Switching** — Switch between Claude models directly from the dashboard. Hot-reloads via OpenClaw's config watcher.
-- **📅 Activity Calendar** — Monthly view of agent activity, parsed from memory files and task history.
-- **📁 Content Browser** — Browse workspace files with markdown preview, syntax highlighting, and download.
-- **🧩 Skills Manager** — View all bundled/workspace skills, enable/disable them, create custom skills.
-- **💜 Soul Editor** — Edit SOUL.md, IDENTITY.md, USER.md, AGENTS.md with version history and persona templates.
-- **⚡ Task Execution** — Tasks execute automatically via cron (every 2 min) or heartbeat (every 30 min). Hit "Run Now" for immediate execution.
+- Kanban task board with drag/drop, priority, skills, and scheduling
+- Usage and cost tracking from OpenClaw session data
+- Model switching from dashboard settings
+- Calendar activity view from memory + completed tasks
+- Workspace file browser with markdown preview
+- Skills manager and Soul/Workspace editors
 
-## Security
+## Security Model
 
-The dashboard binds to **localhost only** (127.0.0.1:3333). Access it via SSH tunnel:
+VidClaw binds to localhost by default (`127.0.0.1:3333`). For remote hosts, use an SSH tunnel:
 
 ```bash
-ssh -L 3333:localhost:3333 root@your-server
+ssh -L 3333:localhost:3333 <user>@<server-host>
 ```
 
-Then open `http://localhost:3333` in your browser. No ports exposed, no auth needed — SSH is the auth layer.
+Then open `http://localhost:3333`.
 
-## Quick Install
+## Prerequisites
 
-### Prerequisites
+- OpenClaw installed and running
+- Node.js `>=18` and npm `>=9`
+- Git
 
-- [OpenClaw](https://github.com/openclaw/openclaw) installed and running
-- Node.js 18+ (see below)
-- SSH access to your server
-
-#### Installing Node.js
+Check your environment quickly:
 
 ```bash
-# Ubuntu/Debian
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# macOS
-brew install node
-
-# Or use nvm (any platform)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-nvm install 22
+./doctor.sh
 ```
 
-### Setup
+## Install
 
 ```bash
-# Clone into your OpenClaw workspace
 cd ~/.openclaw/workspace
 git clone https://github.com/madrzak/vidclaw.git dashboard
-
-# Run the setup script (installs deps, builds, sets up systemd)
 cd dashboard
 ./setup.sh
 ```
 
-That's it. The setup script handles everything — npm install, frontend build, systemd service creation, and starts the dashboard automatically.
+`setup.sh` is idempotent: safe to re-run.
 
-Access via SSH tunnel:
+### macOS Notes
+
+- Default service mode is a per-user LaunchAgent (`~/Library/LaunchAgents/ai.vidclaw.dashboard.plist`).
+- Homebrew Node path (`/opt/homebrew/bin`) is supported automatically.
+- Install Node with:
+
 ```bash
-ssh -L 3333:localhost:3333 root@your-server
-# Then open http://localhost:3333
+brew install node
 ```
 
-The setup script also configures your `HEARTBEAT.md` so your agent automatically picks up tasks from the board.
+Optional root LaunchDaemon mode (advanced):
+1. Copy the generated plist to `/Library/LaunchDaemons/`.
+2. Set correct owner/permissions (`root:wheel`, `644`).
+3. Add a `UserName` key in the plist for the runtime user.
+4. Load with `sudo launchctl bootstrap system /Library/LaunchDaemons/<label>.plist`.
 
-## Updating
+### Linux Notes
+
+- Default service mode is `systemd` when available.
+- If systemd is unavailable, scripts fall back to direct process mode.
+- Install Node with your distro package manager (apt/yum/dnf/pacman) or nvm.
+
+## Run / Operate
+
+Portable wrappers:
 
 ```bash
-cd ~/.openclaw/workspace/dashboard
+./start.sh
+./stop.sh
+./status.sh
+./logs.sh
+```
 
-# Update to latest stable release (recommended)
+Development mode:
+
+```bash
+./start.sh --dev
+```
+
+This starts backend + Vite for local development.
+
+### Service Backends
+
+- `auto` (default): `launchd` on macOS, `systemd` on Linux when available.
+- `direct`: no service manager; starts/stops a managed background process with PID/log files in `data/`.
+- Override per command with `--service-mode ...` or globally with `VIDCLAW_SERVICE_MODE=...`.
+
+## Update
+
+```bash
 ./update.sh
-
-# Update to bleeding edge (latest commit on main)
-./update.sh --latest
 ```
 
-## Configuration
+Behavior:
+- `git fetch --all --prune`
+- `git pull --ff-only` (safe default)
+- `npm ci` (or `npm install` if no lockfile)
+- `npm run build`
+- service restart
 
-Models and usage data are pulled automatically from your OpenClaw config (`openclaw.json`).
+If branch history diverged and you intentionally want a merge pull:
+
+```bash
+./update.sh --allow-merge-pull
+```
+
+## Uninstall
+
+Remove service wiring only:
+
+```bash
+./uninstall.sh
+```
+
+Remove service + runtime data:
+
+```bash
+./uninstall.sh --purge-data
+```
+
+`./remove-service.sh` is an alias of `./uninstall.sh`.
+
+## Advanced Flags
+
+All operational scripts support:
+
+- `--dry-run` or `DRY_RUN=1`: preview actions without changes
+- `--interactive` or `ALLOW_INTERACTIVE=1`: allow sudo password prompts
+- `--service-mode auto|systemd|launchd|direct|none`: override service backend
+
+## Troubleshooting
+
+- Permission errors writing `/etc/systemd/system/*.service`:
+  - Re-run with `ALLOW_INTERACTIVE=1` or run as root.
+- Port `3333` already in use:
+  - Stop the conflicting process, or set `PORT` and restart.
+- LaunchAgent not loaded on macOS:
+  - Check `./status.sh` and inspect logs with `./logs.sh`.
+- Node/npm not found in non-login shells:
+  - Run `./doctor.sh`; ensure your package manager or version manager exports PATH for non-interactive shells.
+
+## Case-Sensitivity Guidance
+
+Some macOS filesystems are case-insensitive while Linux is typically case-sensitive. Keep import path casing exact and avoid creating files that differ only by letter case.
 
 ## API
 
-See [API.md](API.md) for the full endpoint reference.
+See [API.md](API.md) for endpoint reference.
 
 ## Stack
 
-- **Frontend:** React + Vite + Tailwind CSS
-- **Backend:** Express.js
-- **Data:** JSON files (no database required)
-- **Auth:** SSH tunnel (zero-config security)
+- Frontend: React + Vite + Tailwind CSS
+- Backend: Express.js
+- Data store: JSON files
 
 ## License
 
 MIT
-
----
-
-Copyright (c) 2026 [woocassh](https://x.com/woocassh) · [GitHub](https://github.com/madrzak/vidclaw) · MIT License

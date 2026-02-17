@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install --production=false
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Bash syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            setup.sh
+            update.sh
+            start.sh
+            stop.sh
+            status.sh
+            logs.sh
+            uninstall.sh
+            remove-service.sh
+            doctor.sh
+            scripts/lib/common.sh
+            scripts/lib/service.sh
+          )
+          for file in "${files[@]}"; do
+            bash -n "${file}"
+          done
+
+      - name: Shellcheck (optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            setup.sh
+            update.sh
+            start.sh
+            stop.sh
+            status.sh
+            logs.sh
+            uninstall.sh
+            remove-service.sh
+            doctor.sh
+            scripts/lib/common.sh
+            scripts/lib/service.sh
+          )
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck "${files[@]}"
+          else
+            echo "shellcheck not available on this runner; skipping"
+          fi
+
+      - name: Doctor (non-service mode)
+        run: ./doctor.sh --service-mode none

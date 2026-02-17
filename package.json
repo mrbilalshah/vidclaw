@@ -7,7 +7,19 @@
     "dev": "vite",
     "build": "vite build",
     "start": "node server.js",
-    "preview": "vite preview"
+    "watch": "vite build && node --watch-path=server server.js",
+    "preview": "vite preview",
+    "setup": "./setup.sh",
+    "update": "./update.sh",
+    "ops:start": "./start.sh",
+    "ops:stop": "./stop.sh",
+    "ops:status": "./status.sh",
+    "ops:logs": "./logs.sh --no-follow",
+    "ops:doctor": "./doctor.sh"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

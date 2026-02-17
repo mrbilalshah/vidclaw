@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { SKILLS_DIRS } from '../config.js';
+import { SKILL_SCAN_DIRS } from '../config.js';
 import { readOpenclawJson } from './fileStore.js';
 
 export function parseFrontmatter(content) {
@@ -18,31 +18,39 @@ export function scanSkills() {
   const config = readOpenclawJson();
   const entries = config.skills?.entries || {};
   const skills = [];
-  for (const [source, dir] of Object.entries(SKILLS_DIRS)) {
-    try {
-      const dirs = fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory());
-      for (const d of dirs) {
-        const skillPath = path.join(dir, d.name);
-        const mdPath = path.join(skillPath, 'SKILL.md');
-        let fm = {}, hasMetadata = false;
-        try {
-          const content = fs.readFileSync(mdPath, 'utf-8');
-          fm = parseFrontmatter(content);
-          hasMetadata = Object.keys(fm).length > 0;
-        } catch {}
-        const id = d.name;
-        const entry = entries[id];
-        skills.push({
-          id,
-          name: fm.name || d.name,
-          description: fm.description || '',
-          source,
-          enabled: entry?.enabled !== undefined ? entry.enabled : true,
-          path: skillPath,
-          hasMetadata,
-        });
-      }
-    } catch {}
+  const seenPaths = new Set();
+
+  for (const [source, roots] of Object.entries(SKILL_SCAN_DIRS)) {
+    const rootList = Array.isArray(roots) ? roots : [roots];
+    for (const rootDir of rootList) {
+      try {
+        const dirs = fs.readdirSync(rootDir, { withFileTypes: true }).filter(d => d.isDirectory());
+        for (const d of dirs) {
+          const skillPath = path.join(rootDir, d.name);
+          if (seenPaths.has(skillPath)) continue;
+          seenPaths.add(skillPath);
+
+          const mdPath = path.join(skillPath, 'SKILL.md');
+          let fm = {}, hasMetadata = false;
+          try {
+            const content = fs.readFileSync(mdPath, 'utf-8');
+            fm = parseFrontmatter(content);
+            hasMetadata = Object.keys(fm).length > 0;
+          } catch {}
+          const id = d.name;
+          const entry = entries[id];
+          skills.push({
+            id,
+            name: fm.name || d.name,
+            description: fm.description || '',
+            source,
+            enabled: entry?.enabled !== undefined ? entry.enabled : true,
+            path: skillPath,
+            hasMetadata,
+          });
+        }
+      } catch {}
+    }
   }
   return skills;
 }

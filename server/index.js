@@ -1,6 +1,6 @@
 import express from 'express';
 import http from 'http';
-import { PORT } from './config.js';
+import { HOST, PORT } from './config.js';
 import { setupWebSocket } from './broadcast.js';
 import { setupMiddleware } from './middleware.js';
 import router from './routes.js';
@@ -12,6 +12,6 @@ setupWebSocket(server);
 setupMiddleware(app);
 app.use(router);
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Dashboard running at http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`Dashboard running at http://${HOST}:${PORT}`);
 });
