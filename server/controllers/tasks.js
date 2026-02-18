@@ -176,12 +176,15 @@ export function bulkDeleteTasks(req, res) {
 }
 
 export function deleteTask(req, res) {
-  let tasks = readTasks();
-  const deleted = tasks.find(t => t.id === req.params.id);
-  tasks = tasks.filter(t => t.id !== req.params.id);
+  const tasks = readTasks();
+  const task = tasks.find(t => t.id === req.params.id);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  task.status = 'archived';
+  task.archivedAt = new Date().toISOString();
+  task.updatedAt = new Date().toISOString();
   writeTasks(tasks);
-  if (deleted) logActivity('user', 'task_deleted', { taskId: req.params.id, title: deleted.title });
-  broadcast('tasks', tasks);
+  logActivity('user', 'task_archived', { taskId: task.id, title: task.title });
+  broadcast('tasks', tasks.filter(t => t.status !== 'archived'));
   res.json({ ok: true });
 }
 
