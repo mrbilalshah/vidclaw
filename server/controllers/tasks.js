@@ -198,3 +198,22 @@ export function getCalendar(req, res) {
   }
   res.json(data);
 }
+
+export function getRunHistory(req, res) {
+  const tasks = readTasks();
+  const task = tasks.find(t => t.id === req.params.id);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  res.json(task.runHistory || []);
+}
+
+export function toggleSchedule(req, res) {
+  const tasks = readTasks();
+  const idx = tasks.findIndex(t => t.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Task not found' });
+  tasks[idx].scheduleEnabled = !tasks[idx].scheduleEnabled;
+  tasks[idx].updatedAt = new Date().toISOString();
+  writeTasks(tasks);
+  logActivity({ type: tasks[idx].scheduleEnabled ? 'schedule-resumed' : 'schedule-paused', taskId: tasks[idx].id, title: tasks[idx].title, actor: 'user' });
+  broadcast({ type: 'task-updated', task: tasks[idx] });
+  res.json(tasks[idx]);
+}
