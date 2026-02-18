@@ -1,4 +1,3 @@
-import { readFile } from 'fs/promises';
 import { exec as execCb } from 'child_process';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -7,13 +6,12 @@ import { logActivity } from '../lib/fileStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.join(__dirname, '..', '..');
-const pkgPath = path.join(projectRoot, 'package.json');
 
 export async function getVidclawVersion(req, res) {
   const result = {};
   try {
-    const pkg = JSON.parse(await readFile(pkgPath, 'utf-8'));
-    result.current = pkg.version;
+    const tag = await exec(`git -C "${projectRoot}" describe --tags --abbrev=0`);
+    result.current = tag.replace(/^v/, '');
   } catch (e) {
     result.current = null;
   }

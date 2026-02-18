@@ -27,6 +27,20 @@ Then open `http://localhost:3333`.
 
 You can override the bind address with `HOST` (for example `HOST=0.0.0.0`), but that exposes the dashboard on your network interfaces. Only use non-localhost binds when you explicitly control network access (firewall, private subnet, reverse proxy auth).
 
+### Tailscale (Alternative to SSH)
+
+If you use [Tailscale](https://tailscale.com) for remote access (which is OpenClaw's recommended method), you can expose VidClaw via Tailscale Serve:
+
+```bash
+tailscale serve --bg --https=8443 http://127.0.0.1:3333
+```
+
+Then access it at `https://your-machine.your-tailnet.ts.net:8443/`.
+
+> **⚠️ OpenClaw `resetOnExit` gotcha:** If your OpenClaw gateway config has `tailscale.resetOnExit: true`, the gateway tears down **all** Tailscale Serve rules when it stops — not just its own. This means every gateway restart (updates, crashes, watchdog recovery) will silently kill VidClaw's Tailscale route.
+>
+> **Fix:** Ensure VidClaw re-registers its Tailscale Serve route on startup. If using systemd, add `ExecStartPre=-/usr/bin/tailscale serve --bg --https=8443 http://127.0.0.1:3333` to the service file. If using launchd on macOS, use a wrapper script that runs the `tailscale serve` command before starting the node server.
+
 ## Prerequisites
 
 - OpenClaw installed and running
