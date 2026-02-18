@@ -18,7 +18,14 @@ export async function listCredentials(req, res) {
         try {
           const stat = await fs.stat(path.join(CREDS_DIR, name));
           if (!stat.isFile()) return null;
-          return { name, exists: true, modifiedAt: stat.mtime.toISOString() };
+          if (name.endsWith('.meta.json')) return null;
+          let type = 'text', fileName = null;
+          try {
+            const meta = JSON.parse(await fs.readFile(path.join(CREDS_DIR, name + '.meta.json'), 'utf8'));
+            type = meta.type || 'text';
+            fileName = meta.fileName || null;
+          } catch {}
+          return { name, exists: true, type, fileName, modifiedAt: stat.mtime.toISOString() };
         } catch { return null; }
       })
     );
@@ -30,13 +37,24 @@ export async function listCredentials(req, res) {
 
 export async function putCredential(req, res) {
   const { name } = req.params;
-  const { value } = req.body || {};
+  const { value, type = 'text' } = req.body || {};
   if (!validName(name)) return res.status(400).json({ error: 'Invalid credential name. Use only letters, numbers, hyphens, underscores.' });
   if (typeof value !== 'string' || !value) return res.status(400).json({ error: 'Value is required.' });
   try {
     await fs.mkdir(CREDS_DIR, { recursive: true });
     const filePath = path.join(CREDS_DIR, name);
-    await fs.writeFile(filePath, value, { mode: 0o600 });
+    // For file type, value is base64-encoded content — decode it before writing
+    const content = type === 'file' ? Buffer.from(value, 'base64') : value;
+    await fs.writeFile(filePath, content, { mode: 0o600 });
+    // Store metadata (type, original filename) alongside if it's a file
+    if (type === 'file') {
+      const { fileName } = req.body || {};
+      const meta = { type: 'file', fileName: fileName || name };
+      await fs.writeFile(filePath + '.meta.json', JSON.stringify(meta), { mode: 0o600 });
+    } else {
+      // Remove meta file if switching back to text
+      await fs.unlink(filePath + '.meta.json').catch(() => {});
+    }
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
