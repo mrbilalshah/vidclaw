@@ -114,7 +114,7 @@ export default function SettingsPage() {
   const { setTimezone: setGlobalTimezone } = useTimezone()
 
   const [versionInfo, setVersionInfo] = useState(null)
-  const [versionLoading, setVersionLoading] = useState(true)
+  const [versionChecking, setVersionChecking] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [updateResult, setUpdateResult] = useState(null)
 
@@ -122,6 +122,7 @@ export default function SettingsPage() {
   const [vidclawLoading, setVidclawLoading] = useState(true)
   const [vidclawUpdating, setVidclawUpdating] = useState(false)
   const [vidclawUpdateResult, setVidclawUpdateResult] = useState(null)
+  const [refreshCountdown, setRefreshCountdown] = useState(null)
 
   const isDirty = heartbeat !== savedHeartbeat || timezone !== savedTimezone
 
@@ -137,15 +138,24 @@ export default function SettingsPage() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-    fetch('/api/openclaw/version')
-      .then(r => r.json())
-      .then(d => { setVersionInfo(d); setVersionLoading(false) })
-      .catch(() => setVersionLoading(false))
     fetch('/api/vidclaw/version')
       .then(r => r.json())
       .then(d => { setVidclawInfo(d); setVidclawLoading(false) })
       .catch(() => setVidclawLoading(false))
   }, [])
+
+  const checkOpenclawVersion = async () => {
+    setVersionChecking(true)
+    try {
+      const r = await fetch('/api/openclaw/version')
+      const d = await r.json()
+      setVersionInfo(d)
+    } catch {
+      setVersionInfo(null)
+    } finally {
+      setVersionChecking(false)
+    }
+  }
 
   const handleUpdate = async () => {
     setUpdating(true)
@@ -172,6 +182,13 @@ export default function SettingsPage() {
       if (!r.ok) throw new Error(data.error || 'Update failed')
       setVidclawUpdateResult({ success: true, version: data.version })
       setVidclawInfo(v => ({ ...v, current: data.version, outdated: false }))
+      setRefreshCountdown(5)
+      const interval = setInterval(() => {
+        setRefreshCountdown(prev => {
+          if (prev <= 1) { clearInterval(interval); window.location.reload(); return 0 }
+          return prev - 1
+        })
+      }, 1000)
     } catch (e) {
       setVidclawUpdateResult({ success: false, error: e.message })
     } finally {
@@ -266,12 +283,15 @@ export default function SettingsPage() {
           <Package size={16} className="text-green-400" />
           <h3 className="font-medium text-sm">OpenClaw Version</h3>
         </div>
-        {versionLoading ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="animate-spin" size={14} /> Checking version…
-          </div>
-        ) : !versionInfo || (!versionInfo.current && !versionInfo.latest) ? (
-          <p className="text-xs text-muted-foreground">Could not check version</p>
+        {!versionInfo ? (
+          <button
+            onClick={checkOpenclawVersion}
+            disabled={versionChecking}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            {versionChecking ? <Loader2 className="animate-spin" size={14} /> : <Package size={14} />}
+            {versionChecking ? 'Checking…' : 'Check for updates'}
+          </button>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-3 text-sm">
@@ -359,7 +379,11 @@ export default function SettingsPage() {
               </button>
             )}
             {vidclawUpdateResult?.success && (
-              <p className="text-xs text-green-400">Updated to v{vidclawUpdateResult.version}. VidClaw is restarting…</p>
+              <p className="text-xs text-green-400">
+                Updated to v{vidclawUpdateResult.version}.{' '}
+                <a onClick={() => window.location.reload()} className="underline cursor-pointer hover:text-green-300">Refresh now</a>
+                {' '}or auto-refresh in {refreshCountdown}s…
+              </p>
             )}
             {vidclawUpdateResult && !vidclawUpdateResult.success && (
               <p className="text-xs text-red-400">Update failed: {vidclawUpdateResult.error}</p>
