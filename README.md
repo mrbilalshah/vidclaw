@@ -15,43 +15,24 @@ A secure, self-hosted command center for managing your OpenClaw AI agent.
 - **💜 Soul Editor** — Edit SOUL.md, IDENTITY.md, USER.md, AGENTS.md with version history and persona templates.
 - **⚡ Task Execution** — Tasks execute automatically via cron (every 2 min) or heartbeat (every 30 min). Hit "Run Now" for immediate execution.
 
-## Security Model
+## Security
 
-VidClaw binds to localhost by default (`127.0.0.1:3333`). For remote hosts, use an SSH tunnel:
+VidClaw binds to localhost only (`127.0.0.1:3333`) — no external network calls, all data stays on your machine.
 
-```bash
-ssh -L 3333:localhost:3333 <user>@<server-host>
-```
+Two ways to access from another device:
 
-Then open `http://localhost:3333`.
+| Method | Command |
+|--------|---------|
+| **SSH tunnel** | `ssh -L 3333:localhost:3333 <user>@<server>` |
+| **Tailscale Serve** | Pass `--tailscale` to `setup.sh` (see Install) |
 
-You can override the bind address with `HOST` (for example `HOST=0.0.0.0`), but that exposes the dashboard on your network interfaces. Only use non-localhost binds when you explicitly control network access (firewall, private subnet, reverse proxy auth).
-
-### Tailscale (Alternative to SSH)
-
-If you use [Tailscale](https://tailscale.com) for remote access (which is OpenClaw's recommended method), you can expose VidClaw via Tailscale Serve:
-
-```bash
-tailscale serve --bg --https=8443 http://127.0.0.1:3333
-```
-
-Then access it at `https://your-machine.your-tailnet.ts.net:8443/`.
-
-> **⚠️ OpenClaw `resetOnExit` gotcha:** If your OpenClaw gateway config has `tailscale.resetOnExit: true`, the gateway tears down **all** Tailscale Serve rules when it stops — not just its own. This means every gateway restart (updates, crashes, watchdog recovery) will silently kill VidClaw's Tailscale route.
->
-> **Fix:** Ensure VidClaw re-registers its Tailscale Serve route on startup. If using systemd, add `ExecStartPre=-/usr/bin/tailscale serve --bg --https=8443 http://127.0.0.1:3333` to the service file. If using launchd on macOS, use a wrapper script that runs the `tailscale serve` command before starting the node server.
+Then open `http://localhost:3333` (SSH) or `https://your-machine.your-tailnet.ts.net:8443` (Tailscale).
 
 ## Prerequisites
 
 - OpenClaw installed and running
-- Node.js `>=18` and npm `>=9`
+- Node.js >= 18
 - Git
-
-Check your environment quickly:
-
-```bash
-./doctor.sh
-```
 
 ## Install
 
@@ -59,63 +40,11 @@ Check your environment quickly:
 cd ~/.openclaw/workspace
 git clone https://github.com/madrzak/vidclaw.git dashboard
 cd dashboard
-./setup.sh
-
-# Or with Tailscale Serve integration (optional, default port 8443)
-./setup.sh --tailscale
-./setup.sh --tailscale 9443  # custom port
+./setup.sh                  # localhost-only
+./setup.sh --tailscale      # with Tailscale Serve on port 8443
 ```
 
-When `--tailscale` is passed, the service is configured to register its Tailscale Serve route on every start, so the route survives OpenClaw gateway restarts with `resetOnExit: true`.
-
-`setup.sh` is idempotent: safe to re-run.
-
-### macOS Notes
-
-- Default service mode is a per-user LaunchAgent (`~/Library/LaunchAgents/ai.vidclaw.dashboard.plist`).
-- Homebrew Node path (`/opt/homebrew/bin`) is supported automatically.
-- Install Node with:
-
-```bash
-brew install node
-```
-
-Optional root LaunchDaemon mode (advanced):
-1. Copy the generated plist to `/Library/LaunchDaemons/`.
-2. Set correct owner/permissions (`root:wheel`, `644`).
-3. Add a `UserName` key in the plist for the runtime user.
-4. Load with `sudo launchctl bootstrap system /Library/LaunchDaemons/<label>.plist`.
-
-### Linux Notes
-
-- Default service mode is `systemd` when available.
-- If systemd is unavailable, scripts fall back to direct process mode.
-- Install Node with your distro package manager (apt/yum/dnf/pacman) or nvm.
-
-## Run / Operate
-
-Portable wrappers:
-
-```bash
-./start.sh
-./stop.sh
-./status.sh
-./logs.sh
-```
-
-Development mode:
-
-```bash
-./start.sh --dev
-```
-
-This starts backend + Vite for local development.
-
-### Service Backends
-
-- `auto` (default): `launchd` on macOS, `systemd` on Linux when available.
-- `direct`: no service manager; starts/stops a managed background process with PID/log files in `data/`.
-- Override per command with `--service-mode ...` or globally with `VIDCLAW_SERVICE_MODE=...`.
+`setup.sh` is idempotent — safe to re-run. Run `./doctor.sh` to verify your environment.
 
 ## Update
 
@@ -123,67 +52,30 @@ This starts backend + Vite for local development.
 ./update.sh
 ```
 
-Behavior:
-- `git fetch --all --prune`
-- `git pull --ff-only` (safe default)
-- `npm ci` (or `npm install` if no lockfile)
-- `npm run build`
-- service restart
-
-If branch history diverged and you intentionally want a merge pull:
+## Usage
 
 ```bash
-./update.sh --allow-merge-pull
+./start.sh       # start the service
+./stop.sh        # stop the service
+./status.sh      # check service status
+./logs.sh        # view logs
 ```
 
-## Uninstall
-
-Remove service wiring only:
+## Development
 
 ```bash
-./uninstall.sh
+./start.sh --dev
 ```
 
-Remove service + runtime data:
-
-```bash
-./uninstall.sh --purge-data
-```
-
-`./remove-service.sh` is an alias of `./uninstall.sh`.
-
-## Advanced Flags
-
-All operational scripts support:
-
-- `--dry-run` or `DRY_RUN=1`: preview actions without changes
-- `--interactive` or `ALLOW_INTERACTIVE=1`: allow sudo password prompts
-- `--service-mode auto|systemd|launchd|direct|none`: override service backend
-
-## Troubleshooting
-
-- Permission errors writing `/etc/systemd/system/*.service`:
-  - Re-run with `ALLOW_INTERACTIVE=1` or run as root.
-- Port `3333` already in use:
-  - Stop the conflicting process, or set `PORT` and restart.
-- LaunchAgent not loaded on macOS:
-  - Check `./status.sh` and inspect logs with `./logs.sh`.
-- Node/npm not found in non-login shells:
-  - Run `./doctor.sh`; ensure your package manager or version manager exports PATH for non-interactive shells.
-
-## Case-Sensitivity Guidance
-
-Some macOS filesystems are case-insensitive while Linux is typically case-sensitive. Keep import path casing exact and avoid creating files that differ only by letter case.
+Starts the backend + Vite dev server with HMR.
 
 ## API
 
-See [API.md](API.md) for endpoint reference.
+See [API.md](API.md) for the endpoint reference.
 
 ## Stack
 
-- Frontend: React + Vite + Tailwind CSS
-- Backend: Express.js
-- Data store: JSON files
+React + Vite + Tailwind CSS / Express.js / JSON file storage
 
 ## License
 
