@@ -9,7 +9,8 @@ export function getSettings(req, res) {
     const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
     const heartbeatEvery = config?.agents?.defaults?.heartbeat?.every || '30m';
     const timezone = config?.agents?.defaults?.timezone || 'UTC';
-    res.json({ heartbeatEvery, timezone });
+    const maxConcurrent = config?.agents?.defaults?.subagents?.maxConcurrent || 1;
+    res.json({ heartbeatEvery, timezone, maxConcurrent });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -17,7 +18,7 @@ export function getSettings(req, res) {
 
 export async function postSettings(req, res) {
   try {
-    const { heartbeatEvery, timezone } = req.body;
+    const { heartbeatEvery, timezone, maxConcurrent } = req.body;
 
     const allowedHeartbeats = ['5m', '10m', '15m', '30m', '1h'];
     if (heartbeatEvery && !allowedHeartbeats.includes(heartbeatEvery)) {
@@ -31,11 +32,19 @@ export async function postSettings(req, res) {
       }
     }
 
+    if (maxConcurrent !== undefined) {
+      const val = parseInt(maxConcurrent, 10);
+      if (!Number.isInteger(val) || val < 1 || val > 8) {
+        return res.status(400).json({ error: 'maxConcurrent must be an integer between 1 and 8' });
+      }
+    }
+
     const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
     if (!config.agents) config.agents = {};
     if (!config.agents.defaults) config.agents.defaults = {};
 
     const heartbeatChanged = heartbeatEvery && heartbeatEvery !== config.agents.defaults.heartbeat?.every;
+    const maxConcurrentChanged = maxConcurrent !== undefined && parseInt(maxConcurrent, 10) !== (config.agents.defaults.subagents?.maxConcurrent || 1);
 
     if (heartbeatEvery) {
       if (!config.agents.defaults.heartbeat) config.agents.defaults.heartbeat = {};
@@ -44,22 +53,33 @@ export async function postSettings(req, res) {
     if (timezone) {
       config.agents.defaults.timezone = timezone;
     }
+    if (maxConcurrent !== undefined) {
+      if (!config.agents.defaults.subagents) config.agents.defaults.subagents = {};
+      config.agents.defaults.subagents.maxConcurrent = parseInt(maxConcurrent, 10);
+    }
 
     fs.writeFileSync(OPENCLAW_JSON, JSON.stringify(config, null, 2));
 
     const details = {};
     if (heartbeatEvery) details.heartbeatEvery = heartbeatEvery;
     if (timezone) details.timezone = timezone;
+    if (maxConcurrent !== undefined) details.maxConcurrent = parseInt(maxConcurrent, 10);
     logActivity('dashboard', 'settings_updated', details);
-    broadcast('settings', { heartbeatEvery: heartbeatEvery || config.agents.defaults.heartbeat?.every, timezone: timezone || config.agents.defaults.timezone });
 
-    if (heartbeatChanged) {
+    const needsRestart = heartbeatChanged || maxConcurrentChanged;
+    broadcast('settings', {
+      heartbeatEvery: heartbeatEvery || config.agents.defaults.heartbeat?.every,
+      timezone: timezone || config.agents.defaults.timezone,
+      maxConcurrent: config.agents.defaults.subagents?.maxConcurrent || 1,
+    });
+
+    if (needsRestart) {
       execCb('openclaw gateway restart', (err) => {
         if (err) console.error('Failed to restart openclaw:', err.message);
       });
     }
 
-    res.json({ ok: true, restarted: !!heartbeatChanged });
+    res.json({ ok: true, restarted: !!needsRestart });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

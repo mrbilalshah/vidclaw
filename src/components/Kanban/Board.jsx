@@ -22,6 +22,7 @@ export default function Board() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [viewTask, setViewTask] = useState(null)
+  const [capacity, setCapacity] = useState({ maxConcurrent: 1, activeCount: 0, remainingSlots: 1 })
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -41,8 +42,16 @@ export default function Board() {
     }
   }, [])
 
-  useEffect(() => { fetchTasks() }, [fetchTasks])
-  useSocket('tasks', setTasks)
+  const fetchCapacity = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tasks/capacity')
+      setCapacity(await res.json())
+    } catch {}
+  }, [])
+
+  useEffect(() => { fetchTasks(); fetchCapacity() }, [fetchTasks, fetchCapacity])
+  useSocket('tasks', (newTasks) => { setTasks(newTasks); fetchCapacity() })
+  useSocket('settings', () => { fetchCapacity() })
 
   const activeTask = tasks.find(t => t.id === activeId)
 
@@ -240,6 +249,7 @@ export default function Board() {
               onRun={handleRun}
               onToggleSchedule={handleToggleSchedule}
               onBulkArchive={handleBulkArchive}
+              capacity={col.id === 'in-progress' ? capacity : undefined}
             />
           ))}
         </div>

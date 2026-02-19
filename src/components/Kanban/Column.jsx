@@ -144,7 +144,7 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
   )
 }
 
-export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onView, onDelete, onRun, onToggleSchedule, onBulkArchive }) {
+export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onView, onDelete, onRun, onToggleSchedule, onBulkArchive, capacity }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
@@ -185,6 +185,22 @@ export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onVie
           <div className={cn('w-2 h-2 rounded-full', column.color)} />
           <span className="text-sm font-medium">{column.title}</span>
           <span className="text-xs text-muted-foreground bg-secondary rounded-full px-1.5">{tasks.length}</span>
+          {capacity && capacity.maxConcurrent > 1 && (
+            <div className="flex items-center gap-1 ml-1.5">
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: capacity.maxConcurrent }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full',
+                      i < capacity.activeCount ? 'bg-amber-400' : 'bg-muted-foreground/30'
+                    )}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] text-muted-foreground">{capacity.activeCount}/{capacity.maxConcurrent}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {column.id === 'done' && tasks.length > 0 && (

@@ -69,53 +69,6 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-ensure_heartbeat_block() {
-  [[ "${SKIP_HEARTBEAT}" == "1" ]] && {
-    log_info "Skipping HEARTBEAT.md update by request."
-    return 0
-  }
-
-  local parent_dir parent_name repo_name heartbeat_file
-  parent_dir="$(dirname "${REPO_ROOT}")"
-  parent_name="$(basename "${parent_dir}")"
-  repo_name="$(basename "${REPO_ROOT}")"
-  heartbeat_file="${parent_dir}/HEARTBEAT.md"
-
-  if [[ "${repo_name}" != "dashboard" || "${parent_name}" != "workspace" ]]; then
-    if [[ "${FORCE_HEARTBEAT:-0}" != "1" ]]; then
-      log_warn "Skipping HEARTBEAT.md update outside */workspace/dashboard. Set FORCE_HEARTBEAT=1 to override."
-      return 0
-    fi
-  fi
-
-  if [[ -f "${heartbeat_file}" ]] && grep -q "## Task Queue Check" "${heartbeat_file}" 2>/dev/null; then
-    log_info "HEARTBEAT.md already contains Task Queue Check block."
-    return 0
-  fi
-
-  if is_dry_run; then
-    log_info "[dry-run] would append Task Queue Check block to ${heartbeat_file}"
-    return 0
-  fi
-
-  touch "${heartbeat_file}"
-  cat >> "${heartbeat_file}" <<'HEARTBEAT_BLOCK'
-
-## Task Queue Check
-0. Record heartbeat: POST http://localhost:3333/api/heartbeat via exec (curl -X POST)
-1. Check for stuck in-progress tasks: GET http://localhost:3333/api/tasks and look for status "in-progress"
-2. For each in-progress task: check if a sub-agent completed the work (use sessions_list to find recent sub-agents, check their last message for completion). If done, POST to http://localhost:3333/api/tasks/{id}/complete with { "result": "<summary from sub-agent>" }. If the task has been in-progress for over 10 minutes with no active sub-agent, POST with { "error": "Task timed out — no active sub-agent found" }.
-3. Fetch http://localhost:3333/api/tasks/queue via exec (curl)
-4. If any tasks returned, pick the FIRST one (highest priority)
-5. Mark it as picked up: POST to http://localhost:3333/api/tasks/{id}/pickup
-6. Spawn a sub-agent with the task: use sessions_spawn with the task title + description as the prompt. If a skill is assigned, tell the sub-agent to read that skill's SKILL.md first.
-7. When the sub-agent completes, POST to http://localhost:3333/api/tasks/{id}/complete with { "result": "<summary of what was done>" } or { "error": "<what went wrong>" } if it failed
-8. Only process ONE task per heartbeat to avoid overload
-HEARTBEAT_BLOCK
-
-  log_ok "Added Task Queue Check block to ${heartbeat_file}"
-}
-
 init_os
 assert_repo_layout
 init_runtime

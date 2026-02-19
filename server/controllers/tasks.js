@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { readTasks, writeTasks, logActivity } from '../lib/fileStore.js';
+import { readTasks, writeTasks, logActivity, readOpenclawJson } from '../lib/fileStore.js';
 import { broadcast } from '../broadcast.js';
 import { isoToDateInTz } from '../lib/timezone.js';
 import { WORKSPACE } from '../config.js';
@@ -45,7 +45,7 @@ export function updateTask(req, res) {
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
   const wasNotDone = tasks[idx].status !== 'done';
-  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order'];
+  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order', 'subagentId'];
   const updates = {};
   for (const k of allowedFields) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
   tasks[idx] = { ...tasks[idx], ...updates, updatedAt: new Date().toISOString() };
@@ -117,7 +117,14 @@ export function getTaskQueue(req, res) {
     if (oa !== ob) return oa - ob;
     return (a.createdAt || '').localeCompare(b.createdAt || '');
   });
-  res.json(queue);
+
+  const config = readOpenclawJson();
+  const maxConcurrent = config?.agents?.defaults?.subagents?.maxConcurrent || 1;
+  const activeCount = tasks.filter(t => t.status === 'in-progress' && t.pickedUp).length;
+  const remainingSlots = Math.max(0, maxConcurrent - activeCount);
+
+  const limitedQueue = req.query.limit === 'capacity' ? queue.slice(0, remainingSlots) : queue;
+  res.json({ tasks: limitedQueue, maxConcurrent, activeCount, remainingSlots });
 }
 
 export function pickupTask(req, res) {
@@ -128,8 +135,9 @@ export function pickupTask(req, res) {
   tasks[idx].status = 'in-progress';
   tasks[idx].startedAt = tasks[idx].startedAt || new Date().toISOString();
   tasks[idx].updatedAt = new Date().toISOString();
+  if (req.body.subagentId) tasks[idx].subagentId = req.body.subagentId;
   writeTasks(tasks);
-  logActivity('bot', 'task_pickup', { taskId: req.params.id, title: tasks[idx].title });
+  logActivity('bot', 'task_pickup', { taskId: req.params.id, title: tasks[idx].title, subagentId: req.body.subagentId || null });
   broadcast('tasks', tasks);
   res.json(tasks[idx]);
 }
@@ -142,6 +150,8 @@ export function completeTask(req, res) {
   tasks[idx].completedAt = new Date().toISOString();
   tasks[idx].updatedAt = new Date().toISOString();
   tasks[idx].result = req.body.result || null;
+  tasks[idx].subagentId = null;
+  tasks[idx].pickedUp = false;
   if (req.body.error) tasks[idx].error = req.body.error;
   writeTasks(tasks);
   logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError: !!req.body.error });
@@ -235,6 +245,57 @@ export function getRunHistory(req, res) {
   const task = tasks.find(t => t.id === req.params.id);
   if (!task) return res.status(404).json({ error: 'Task not found' });
   res.json(task.runHistory || []);
+}
+
+export function getCapacity(req, res) {
+  const tasks = readTasks();
+  const config = readOpenclawJson();
+  const maxConcurrent = config?.agents?.defaults?.subagents?.maxConcurrent || 1;
+  const activeCount = tasks.filter(t => t.status === 'in-progress' && t.pickedUp).length;
+  const remainingSlots = Math.max(0, maxConcurrent - activeCount);
+  res.json({ maxConcurrent, activeCount, remainingSlots });
+}
+
+export function reportStatusCheck(req, res) {
+  const tasks = readTasks();
+  const idx = tasks.findIndex(t => t.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+
+  const { status, message } = req.body;
+  const validStatuses = ['running', 'completed', 'failed', 'timeout'];
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'status must be one of: ' + validStatuses.join(', ') });
+  }
+
+  logActivity('bot', 'task_status_check', { taskId: req.params.id, title: tasks[idx].title, status, message: message || null });
+
+  if (status === 'completed') {
+    tasks[idx].status = 'done';
+    tasks[idx].completedAt = new Date().toISOString();
+    tasks[idx].updatedAt = new Date().toISOString();
+    tasks[idx].result = message || null;
+    tasks[idx].subagentId = null;
+    tasks[idx].pickedUp = false;
+    writeTasks(tasks);
+    broadcast('tasks', tasks);
+    return res.json(tasks[idx]);
+  }
+
+  if (status === 'failed' || status === 'timeout') {
+    tasks[idx].status = 'done';
+    tasks[idx].completedAt = new Date().toISOString();
+    tasks[idx].updatedAt = new Date().toISOString();
+    tasks[idx].error = message || (status === 'timeout' ? 'Task timed out' : 'Task failed');
+    tasks[idx].subagentId = null;
+    tasks[idx].pickedUp = false;
+    writeTasks(tasks);
+    logActivity('bot', 'task_timeout', { taskId: req.params.id, title: tasks[idx].title, message: message || null });
+    broadcast('tasks', tasks);
+    return res.json(tasks[idx]);
+  }
+
+  // status === 'running' — just log, no state change
+  res.json({ ok: true, status: 'running' });
 }
 
 export function toggleSchedule(req, res) {

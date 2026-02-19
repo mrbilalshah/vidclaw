@@ -41,6 +41,8 @@ const ACTION_LABELS = {
   task_pickup: 'Picked up task',
   task_completed: 'Completed task',
   task_deleted: 'Deleted task',
+  task_status_check: 'Checked sub-agent',
+  task_timeout: 'Task timed out',
 }
 
 function ActivityLog({ taskId }) {
@@ -95,6 +97,16 @@ export default function TaskDetailDialog({ open, onClose, task }) {
   const { timezone } = useTimezone()
   const { navigate } = useNav()
 
+  // Live elapsed time for in-progress tasks
+  const [elapsed, setElapsed] = useState('')
+  useEffect(() => {
+    if (!open || !task || task.status !== 'in-progress' || !task.startedAt) { setElapsed(''); return }
+    const tick = () => setElapsed(formatDuration(task.startedAt, new Date().toISOString()) || '')
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [open, task?.id, task?.status, task?.startedAt])
+
   if (!open || !task) return null
 
   const isDone = task.status === 'done'
@@ -130,6 +142,7 @@ export default function TaskDetailDialog({ open, onClose, task }) {
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1.5">
                 <span>Started {formatTime(task.startedAt || task.createdAt, timezone)}</span>
                 {duration && <span className="text-green-400 font-medium flex items-center gap-0.5"><Clock size={10} />{duration}</span>}
+                {isInProgress && elapsed && <span className="text-amber-400 font-medium flex items-center gap-0.5"><Clock size={10} />{elapsed}</span>}
               </div>
             )}
           </div>

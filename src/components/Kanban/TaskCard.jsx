@@ -24,7 +24,7 @@ export function extractFilePaths(text) {
 export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDragging: isDraggingProp }) {
   const { timezone } = useTimezone()
   const [expanded, setExpanded] = useState(false)
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: task.status === 'done' })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: task.status === 'done' || task.status === 'in-progress' })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -59,8 +59,8 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
       style={style}
       className={cn(
         'group bg-card border border-border rounded-lg p-3 transition-shadow',
-        !isDone && 'cursor-grab active:cursor-grabbing',
-        isDone && 'cursor-pointer',
+        !isDone && !isInProgress && 'cursor-grab active:cursor-grabbing',
+        (isDone || isInProgress) && 'cursor-pointer',
         dragging && !isDraggingProp && 'opacity-30',
         isInProgress && 'border-amber-500/50 animate-pulse-subtle',
         hasError && 'border-red-500/50',
@@ -76,12 +76,12 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
           onView(task)
         }
       }}
-      {...(isDone ? {} : { ...attributes, ...listeners })}
+      {...((isDone || isInProgress) ? {} : { ...attributes, ...listeners })}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            {!isDone && <GripVertical size={12} className="text-muted-foreground shrink-0 opacity-50 group-hover:opacity-100" />}
+            {!isDone && !isInProgress && <GripVertical size={12} className="text-muted-foreground shrink-0 opacity-50 group-hover:opacity-100" />}
             {isInProgress && <Loader2 size={12} className="text-amber-400 animate-spin shrink-0" />}
             {isDone && !hasError && <CheckCircle2 size={14} className="text-green-500 shrink-0" />}
             {isDone && hasError && <AlertCircle size={14} className="text-red-500 shrink-0" />}
@@ -160,6 +160,11 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1.5">
           <span>Started {formatTime(task.startedAt, timezone)}</span>
           {elapsed && <span className="text-amber-400 font-medium flex items-center gap-0.5"><Clock size={10} />{elapsed}</span>}
+          {task.subagentId && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-mono truncate max-w-[80px]" title={task.subagentId}>
+              {task.subagentId.slice(0, 8)}
+            </span>
+          )}
         </div>
       )}
 
