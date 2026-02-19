@@ -61,6 +61,23 @@
     <p class="subtitle">All notable updates to VidClaw, the <a href="/features">self-hosted AI dashboard</a> for <a href="/docs">OpenClaw agent management</a>.</p>
 
     <div class="release">
+      <h2>v1.1.1 <span class="tag tag-new">New</span><span class="tag tag-improved">Improved</span><span class="tag tag-fix">Fix</span></h2>
+      <div class="date">February 19, 2026</div>
+      <ul>
+        <li><strong>Task scheduling UI</strong> — set recurring schedules directly from the task dialog: every N hours, days, weeks, or months with a time picker</li>
+        <li><strong>Quick-add schedule shortcuts</strong> — type <code>/daily</code>, <code>/2d</code>, <code>/6h</code> etc. in the quick-add input alongside <code>@skill</code> mentions</li>
+        <li><strong>Schedule indicators on Kanban cards</strong> — orange left border and badge showing interval and next run time; paused schedules shown as dimmed with strikethrough</li>
+        <li><strong>Recurring task auto-reschedule</strong> — completed recurring tasks save to run history and reset to todo with the next scheduled time instead of staying done</li>
+        <li><strong>Calendar future projections</strong> — recurring tasks now show on all future dates (up to 90 days) in the calendar view, not just the next run</li>
+        <li><strong>Delete button in task dialog</strong> — delete tasks directly from the edit modal</li>
+        <li>Fix: schedule times now respect the user's configured timezone</li>
+        <li>Fix: cron step parsing for day-of-month and month fields</li>
+        <li>Fix: <code>computeNextRun</code> import missing in task controller</li>
+        <li>Fix: adding a schedule to an existing task now correctly enables it</li>
+      </ul>
+    </div>
+
+    <div class="release">
       <h2>v1.0.6 <span class="tag tag-new">New</span><span class="tag tag-fix">Fix</span></h2>
       <div class="date">February 18, 2026</div>
       <ul>
