@@ -36,6 +36,20 @@ Then open `http://localhost:3333` (SSH) or `https://your-machine.your-tailnet.ts
 
 ## Install
 
+**One-liner** (installs prerequisites automatically):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/madrzak/vidclaw/main/install.sh | bash
+```
+
+With Tailscale (recommended for remote access):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/madrzak/vidclaw/main/install.sh | bash -s -- --tailscale
+```
+
+**Manual install:**
+
 ```bash
 cd ~/.openclaw/workspace
 git clone https://github.com/madrzak/vidclaw.git dashboard
