@@ -9,4 +9,6 @@ settings.local.json
 /LOCAL.md
 CLAUDE.md
 .env
+.env.local
+.env.*.local
 seed-demo.js

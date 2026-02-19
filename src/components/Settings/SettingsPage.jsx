@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Settings, Clock, Globe, Save, Check, Loader2, Search, ChevronDown, Package, Zap, Layers } from 'lucide-react'
+import { Clock, Globe, Save, Check, Loader2, Search, ChevronDown, Package, Zap, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTimezone } from '../TimezoneContext'
 import PageSkeleton from '../PageSkeleton'
@@ -234,12 +234,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-2 mb-2">
-        <Settings size={20} className="text-primary" />
-        <h2 className="text-lg font-semibold">Settings</h2>
-      </div>
-
-      {/* Heartbeat Section */}
+{/* Heartbeat Section */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Clock size={16} className="text-orange-400" />
@@ -376,7 +371,7 @@ export default function SettingsPage() {
           <p className="text-xs text-muted-foreground">Could not check version</p>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="text-muted-foreground">Installed:</span>
               <span className="font-mono">{vidclawInfo.current || 'unknown'}</span>
               {vidclawInfo.latest && (

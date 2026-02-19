@@ -113,10 +113,10 @@ export default function SoulEditor() {
   return (
     <div className="h-full flex flex-col gap-3">
       {/* File tabs */}
-      <div className="flex gap-1 bg-card rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-card rounded-lg p-1 w-full sm:w-fit overflow-x-auto">
         {FILE_TABS.map(f => (
           <button key={f.name} onClick={() => { if (isDirty && !confirm('Discard unsaved changes?')) return; setActiveFile(f.name); setPreviewContent(null) }}
-            className={cn('px-3 py-1.5 rounded-md text-xs font-medium transition-colors relative',
+            className={cn('flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-medium transition-colors relative whitespace-nowrap',
               activeFile === f.name ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-accent')}>
             {f.label}
             {activeFile === f.name && isDirty && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-yellow-400" />}
@@ -124,9 +124,9 @@ export default function SoulEditor() {
         ))}
       </div>
 
-      <div className="flex-1 flex gap-3 min-h-0">
+      <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0">
         {/* Editor */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-[300px]">
           <div className="flex-1 relative">
             <textarea ref={textareaRef} value={previewContent ?? content}
               onChange={e => { setPreviewContent(null); setContent(e.target.value) }}
@@ -141,19 +141,19 @@ export default function SoulEditor() {
               </div>
             )}
           </div>
-          <div className="flex items-center justify-between mt-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-2 gap-2">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>{content.length} chars</span>
               {lastModified && <span className="flex items-center gap-1"><Clock size={12} /> {timeAgo(lastModified)}</span>}
               {isDirty && <span className="text-yellow-400">● Unsaved changes</span>}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <button onClick={() => { loadFile(activeFile); setPreviewContent(null) }}
-                className="px-3 py-1.5 text-xs border border-border rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                className="flex-1 sm:flex-none px-3 py-1.5 text-xs border border-border rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                 <RotateCcw size={12} className="inline mr-1" />Reset
               </button>
               <button onClick={handleSave} disabled={!isDirty && !saving}
-                className={cn('px-4 py-1.5 text-xs rounded-md font-medium transition-all',
+                className={cn('flex-1 sm:flex-none px-4 py-1.5 text-xs rounded-md font-medium transition-all',
                   saved ? 'bg-green-600 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90',
                   (!isDirty && !saving) && 'opacity-50 cursor-not-allowed')}>
                 {saved ? <><Check size={12} className="inline mr-1" />Saved</> : saving ? 'Saving...' : <><Save size={12} className="inline mr-1" />Save</>}
@@ -163,7 +163,7 @@ export default function SoulEditor() {
         </div>
 
         {/* Right sidebar */}
-        <div className="w-72 shrink-0 flex flex-col bg-card rounded-lg border border-border">
+        <div className="w-full lg:w-72 shrink-0 flex flex-col bg-card rounded-lg border border-border max-h-[300px] lg:max-h-none">
           <div className="flex border-b border-border">
             {isSoul && (
               <button onClick={() => setRightTab('templates')}

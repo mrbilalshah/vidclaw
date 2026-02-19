@@ -110,7 +110,7 @@ export default function Layout({ page, setPage, children }) {
             >
               <Menu size={20} />
             </button>
-            <span className="text-sm font-medium capitalize">{page === 'kanban' ? 'Task Board' : page === 'calendar' ? 'Activity Calendar' : page === 'skills' ? 'Skills Manager' : page === 'soul' ? 'Soul Editor' : page === 'credentials' ? 'Credentials' : page === 'settings' ? 'Settings' : 'Content Browser'}</span>
+            <span className="text-sm font-medium">{navItems.find(n => n.id === page)?.label || page}</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-3">
             <a

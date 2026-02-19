@@ -15,15 +15,19 @@ function Toggle({ checked, onChange }) {
   return (
     <button
       onClick={e => { e.stopPropagation(); onChange(!checked) }}
+      style={{ width: 36, height: 20, minWidth: 36, minHeight: 20, borderRadius: 10 }}
       className={cn(
-        'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',
+        'relative inline-flex items-center transition-colors duration-200 focus:outline-none',
         checked ? 'bg-orange-500' : 'bg-zinc-600'
       )}
     >
-      <span className={cn(
-        'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200',
-        checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
-      )} />
+      <span
+        style={{ width: 14, height: 14, borderRadius: 7 }}
+        className={cn(
+          'inline-block bg-white transition-transform duration-200',
+          checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
+        )}
+      />
     </button>
   )
 }
@@ -113,26 +117,24 @@ function SkillCard({ skill, onToggle, onDelete, onExpand, expanded }) {
       'border border-border rounded-lg bg-card/50 transition-all hover:border-orange-500/30',
       expanded && 'ring-1 ring-orange-500/20'
     )}>
-      <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => onExpand(skill.id)}>
-        <div className="text-muted-foreground">
-          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm truncate">{skill.name}</span>
-            <SourceBadge source={skill.source} />
+      <div className="p-3 sm:p-4 cursor-pointer space-y-2" onClick={() => onExpand(skill.id)}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="text-muted-foreground shrink-0">
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </div>
-          {skill.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{skill.description}</p>}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Toggle checked={skill.enabled} onChange={v => onToggle(skill.id, v)} />
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="font-medium text-sm truncate">{skill.name}</span>
+            <span className="hidden sm:inline-flex"><SourceBadge source={skill.source} /></span>
+          </div>
           {skill.source === 'workspace' && (
             <button onClick={e => { e.stopPropagation(); onDelete(skill.id) }}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors">
+              className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0">
               <Trash2 size={14} />
             </button>
           )}
+          <div className="shrink-0 w-9"><Toggle checked={skill.enabled} onChange={v => onToggle(skill.id, v)} /></div>
         </div>
+        {skill.description && <p className="text-xs text-muted-foreground line-clamp-2 pl-6">{skill.description}</p>}
       </div>
       {expanded && (
         <div className="border-t border-border px-4 py-3">

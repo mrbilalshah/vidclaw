@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Lock, Plus, Pencil, Trash2, X, KeyRound, Shield, Upload, FileText, Key } from 'lucide-react'
+import { Lock, Plus, Pencil, Trash2, X, KeyRound, Upload, FileText, Key } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PageSkeleton from '../PageSkeleton'
 
@@ -135,12 +135,7 @@ export default function CredentialsManager() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield size={20} className="text-orange-400" />
-          <h1 className="text-lg font-semibold">Credentials</h1>
-          <span className="text-xs text-muted-foreground">~/.openclaw/credentials/</span>
-        </div>
+      <div className="flex justify-end">
         <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-medium transition-colors">
           <Plus size={14} /> Add Credential
         </button>
@@ -156,7 +151,7 @@ export default function CredentialsManager() {
       ) : (
         <div className="space-y-2">
           {creds.map(c => (
-            <div key={c.name} className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 group">
+            <div key={c.name} className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-3 sm:px-4 group gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 {c.type === 'file' ? (
                   <FileText size={14} className="text-orange-400 shrink-0" />
@@ -165,15 +160,15 @@ export default function CredentialsManager() {
                 )}
                 <div className="min-w-0">
                   <span className="text-sm font-mono font-medium block truncate">{c.name}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] text-muted-foreground">{new Date(c.modifiedAt).toLocaleString()}</span>
                     {c.type === 'file' && c.fileName && (
-                      <span className="text-[11px] text-orange-400/70 font-mono">{c.fileName}</span>
+                      <span className="text-[11px] text-orange-400/70 font-mono truncate">{c.fileName}</span>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                 <button onClick={() => openEdit(c.name)} className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground" title="Update value">
                   <Pencil size={14} />
                 </button>

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { readFileSync } from 'fs'
@@ -12,22 +12,37 @@ function getVersion() {
   }
 }
 
-export default defineConfig({
-  plugins: [react()],
-  define: {
-    __APP_VERSION__: JSON.stringify(getVersion()),
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const apiTarget = env.VITE_API_TARGET || 'http://localhost:3333'
+
+  return {
+    plugins: [react()],
+    define: {
+      __APP_VERSION__: JSON.stringify(getVersion()),
     },
-  },
-  server: {
-    proxy: {
-      '/api': 'http://localhost:3333'
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/ws': {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+        },
+      }
+    },
+    build: {
+      outDir: 'dist'
     }
-  },
-  build: {
-    outDir: 'dist'
   }
 })
