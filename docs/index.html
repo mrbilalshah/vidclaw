@@ -458,17 +458,12 @@
 
   <div class="install" id="install">
     <h2>Up and running in 60 seconds</h2>
-    <p>Requires Node.js 18+ and a running OpenClaw instance.</p>
+    <p>One command. Installs Node.js, Tailscale, and VidClaw automatically.</p>
     <div class="code-block">
-      <span class="comment"># Clone into your workspace</span><br>
-      <span class="cmd">cd</span> ~/.openclaw/workspace<br>
-      <span class="cmd">git clone</span> https://github.com/madrzak/vidclaw.git dashboard<br><br>
-      <span class="comment"># Run setup (installs deps, builds, starts service)</span><br>
-      <span class="cmd">cd</span> dashboard<br>
-      <span class="cmd">./setup.sh</span><br><br>
-      <span class="comment"># Access from your machine</span><br>
-      <span class="cmd">ssh</span> -L 3333:localhost:3333 root@your-server
+      <span class="comment"># Install everything</span><br>
+      <span class="cmd">curl</span> -fsSL vidclaw.com/install.sh | <span class="cmd">bash</span>
     </div>
+    <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--muted);">Localhost only? Add <code style="color: var(--accent);">--no-tailscale</code></p>
     <a href="https://github.com/madrzak/vidclaw" class="btn btn-primary">Get Started →</a>
   </div>
 
