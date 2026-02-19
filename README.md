@@ -36,16 +36,16 @@ Then open `http://localhost:3333` (SSH) or `https://your-machine.your-tailnet.ts
 
 ## Install
 
-**One-liner** (installs prerequisites automatically):
+**One-liner** (installs everything including Tailscale):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/madrzak/vidclaw/main/install.sh | bash
+curl -fsSL vidclaw.com/install.sh | bash
 ```
 
-With Tailscale (recommended for remote access):
+Without Tailscale (localhost only):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/madrzak/vidclaw/main/install.sh | bash -s -- --tailscale
+curl -fsSL vidclaw.com/install.sh | bash -s -- --no-tailscale
 ```
 
 **Manual install:**
