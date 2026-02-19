@@ -16,9 +16,9 @@ function truncateResult(text, maxLen = 120) {
 // Extract file paths from task result text
 export function extractFilePaths(text) {
   if (!text) return []
-  const pathRegex = /(?:\/[\w.\-]+)+(?:\.[\w]+)?/g
+  const pathRegex = /(?:[\w.\-]+\/)+[\w.\-]+\.[\w]+/g
   const matches = text.match(pathRegex) || []
-  return [...new Set(matches.filter(p => /\.\w+$/.test(p) || p.includes('/workspace/')))]
+  return [...new Set(matches)]
 }
 
 export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDragging: isDraggingProp }) {
@@ -68,8 +68,8 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
         isDone && hasError && 'bg-card/60 opacity-80'
       )}
       onClick={() => {
-        if (isDone && (task.result || task.error)) {
-          setExpanded(prev => !prev)
+        if (isDone && onView) {
+          onView(task)
         } else if (canEdit && onEdit) {
           onEdit(task)
         } else if (!canEdit && onView) {
@@ -81,7 +81,7 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <GripVertical size={12} className="text-muted-foreground shrink-0 opacity-50 group-hover:opacity-100" />
+            {!isDone && <GripVertical size={12} className="text-muted-foreground shrink-0 opacity-50 group-hover:opacity-100" />}
             {isInProgress && <Loader2 size={12} className="text-amber-400 animate-spin shrink-0" />}
             {isDone && !hasError && <CheckCircle2 size={14} className="text-green-500 shrink-0" />}
             {isDone && hasError && <AlertCircle size={14} className="text-red-500 shrink-0" />}
@@ -159,7 +159,7 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
       {isInProgress && task.startedAt && (
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1.5">
           <span>Started {formatTime(task.startedAt, timezone)}</span>
-          {elapsed && <span className="text-amber-400 font-medium">({elapsed})</span>}
+          {elapsed && <span className="text-amber-400 font-medium flex items-center gap-0.5"><Clock size={10} />{elapsed}</span>}
         </div>
       )}
 

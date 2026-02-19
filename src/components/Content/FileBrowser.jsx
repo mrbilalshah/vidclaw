@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { Folder, File, ChevronRight, ArrowLeft, Download, Eye, ArrowUpDown, FileText, FileImage, FileVideo, FileAudio, FileCode, FileArchive } from 'lucide-react'
 import FilePreview from './FilePreview'
 import { cn } from '@/lib/utils'
+import { useNav } from '@/hooks/useNav'
 
 const SORT_OPTIONS = [
   { value: 'name-asc', label: 'Name A→Z' },
@@ -51,10 +52,21 @@ function formatDate(iso) {
 }
 
 export default function FileBrowser() {
+  const { consumeNavData } = useNav()
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState([])
   const [preview, setPreview] = useState(null)
   const [sortBy, setSortBy] = useState('name-asc')
+
+  useEffect(() => {
+    const data = consumeNavData()
+    if (data?.openFile) {
+      const parts = data.openFile.split('/')
+      parts.pop()
+      setCurrentPath(parts.join('/'))
+      setPreview(data.openFile)
+    }
+  }, [])
 
   useEffect(() => {
     fetch(`/api/files?path=${encodeURIComponent(currentPath)}`)
