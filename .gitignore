@@ -8,4 +8,5 @@ data/*-history.json
 settings.local.json
 /LOCAL.md
 CLAUDE.md
+.env
 seed-demo.js
