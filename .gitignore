@@ -2,6 +2,7 @@ node_modules/
 dist/
 data/tasks.json
 data/heartbeat.json
+data/settings.json
 data/soul-history.json
 data/*-history.json
 *.log

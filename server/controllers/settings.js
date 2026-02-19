@@ -1,15 +1,16 @@
 import fs from 'fs';
 import { exec as execCb } from 'child_process';
 import { OPENCLAW_JSON } from '../config.js';
-import { logActivity } from '../lib/fileStore.js';
+import { logActivity, readSettings, writeSettings } from '../lib/fileStore.js';
 import { broadcast } from '../broadcast.js';
 
 export function getSettings(req, res) {
   try {
     const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
     const heartbeatEvery = config?.agents?.defaults?.heartbeat?.every || '30m';
-    const timezone = config?.agents?.defaults?.timezone || 'UTC';
-    const maxConcurrent = config?.agents?.defaults?.subagents?.maxConcurrent || 1;
+    const settings = readSettings();
+    const timezone = settings.timezone || 'UTC';
+    const maxConcurrent = settings.maxConcurrent || 1;
     res.json({ heartbeatEvery, timezone, maxConcurrent });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -39,26 +40,25 @@ export async function postSettings(req, res) {
       }
     }
 
-    const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
-    if (!config.agents) config.agents = {};
-    if (!config.agents.defaults) config.agents.defaults = {};
-
-    const heartbeatChanged = heartbeatEvery && heartbeatEvery !== config.agents.defaults.heartbeat?.every;
-    const maxConcurrentChanged = maxConcurrent !== undefined && parseInt(maxConcurrent, 10) !== (config.agents.defaults.subagents?.maxConcurrent || 1);
-
+    // Only heartbeat goes into openclaw.json
+    let heartbeatChanged = false;
     if (heartbeatEvery) {
-      if (!config.agents.defaults.heartbeat) config.agents.defaults.heartbeat = {};
-      config.agents.defaults.heartbeat.every = heartbeatEvery;
-    }
-    if (timezone) {
-      config.agents.defaults.timezone = timezone;
-    }
-    if (maxConcurrent !== undefined) {
-      if (!config.agents.defaults.subagents) config.agents.defaults.subagents = {};
-      config.agents.defaults.subagents.maxConcurrent = parseInt(maxConcurrent, 10);
+      const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
+      if (!config.agents) config.agents = {};
+      if (!config.agents.defaults) config.agents.defaults = {};
+      heartbeatChanged = heartbeatEvery !== config.agents.defaults.heartbeat?.every;
+      if (heartbeatChanged) {
+        if (!config.agents.defaults.heartbeat) config.agents.defaults.heartbeat = {};
+        config.agents.defaults.heartbeat.every = heartbeatEvery;
+        fs.writeFileSync(OPENCLAW_JSON, JSON.stringify(config, null, 2));
+      }
     }
 
-    fs.writeFileSync(OPENCLAW_JSON, JSON.stringify(config, null, 2));
+    // timezone and maxConcurrent go into VidClaw's own settings file
+    const settings = readSettings();
+    if (timezone) settings.timezone = timezone;
+    if (maxConcurrent !== undefined) settings.maxConcurrent = parseInt(maxConcurrent, 10);
+    writeSettings(settings);
 
     const details = {};
     if (heartbeatEvery) details.heartbeatEvery = heartbeatEvery;
@@ -66,20 +66,19 @@ export async function postSettings(req, res) {
     if (maxConcurrent !== undefined) details.maxConcurrent = parseInt(maxConcurrent, 10);
     logActivity('dashboard', 'settings_updated', details);
 
-    const needsRestart = heartbeatChanged || maxConcurrentChanged;
     broadcast('settings', {
-      heartbeatEvery: heartbeatEvery || config.agents.defaults.heartbeat?.every,
-      timezone: timezone || config.agents.defaults.timezone,
-      maxConcurrent: config.agents.defaults.subagents?.maxConcurrent || 1,
+      heartbeatEvery: heartbeatEvery || undefined,
+      timezone: settings.timezone || 'UTC',
+      maxConcurrent: settings.maxConcurrent || 1,
     });
 
-    if (needsRestart) {
+    if (heartbeatChanged) {
       execCb('openclaw gateway restart', (err) => {
         if (err) console.error('Failed to restart openclaw:', err.message);
       });
     }
 
-    res.json({ ok: true, restarted: !!needsRestart });
+    res.json({ ok: true, restarted: !!heartbeatChanged });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

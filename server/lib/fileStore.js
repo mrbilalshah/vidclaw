@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { TASKS_FILE, ACTIVITY_FILE, HEARTBEAT_FILE, OPENCLAW_JSON } from '../config.js';
+import { TASKS_FILE, ACTIVITY_FILE, HEARTBEAT_FILE, OPENCLAW_JSON, SETTINGS_FILE } from '../config.js';
 
 // --- Tasks ---
 export function readTasks() {
@@ -43,6 +43,15 @@ export function readOpenclawJson() {
 
 export function writeOpenclawJson(data) {
   fs.writeFileSync(OPENCLAW_JSON, JSON.stringify(data, null, 2));
+}
+
+// --- VidClaw Settings ---
+export function readSettings() {
+  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); } catch { return {}; }
+}
+
+export function writeSettings(data) {
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
 }
 
 // --- History files ---

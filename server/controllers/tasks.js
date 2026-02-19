@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { readTasks, writeTasks, logActivity, readOpenclawJson } from '../lib/fileStore.js';
+import { readTasks, writeTasks, logActivity, readSettings } from '../lib/fileStore.js';
 import { broadcast } from '../broadcast.js';
 import { isoToDateInTz } from '../lib/timezone.js';
 import { WORKSPACE } from '../config.js';
@@ -118,8 +118,8 @@ export function getTaskQueue(req, res) {
     return (a.createdAt || '').localeCompare(b.createdAt || '');
   });
 
-  const config = readOpenclawJson();
-  const maxConcurrent = config?.agents?.defaults?.subagents?.maxConcurrent || 1;
+  const settings = readSettings();
+  const maxConcurrent = settings.maxConcurrent || 1;
   const activeCount = tasks.filter(t => t.status === 'in-progress' && t.pickedUp).length;
   const remainingSlots = Math.max(0, maxConcurrent - activeCount);
 
@@ -249,8 +249,8 @@ export function getRunHistory(req, res) {
 
 export function getCapacity(req, res) {
   const tasks = readTasks();
-  const config = readOpenclawJson();
-  const maxConcurrent = config?.agents?.defaults?.subagents?.maxConcurrent || 1;
+  const settings = readSettings();
+  const maxConcurrent = settings.maxConcurrent || 1;
   const activeCount = tasks.filter(t => t.status === 'in-progress' && t.pickedUp).length;
   const remainingSlots = Math.max(0, maxConcurrent - activeCount);
   res.json({ maxConcurrent, activeCount, remainingSlots });
