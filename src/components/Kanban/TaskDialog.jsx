@@ -207,7 +207,7 @@ function buildScheduleString({ scheduleInterval, schedulePeriod, scheduleTime })
   }
 }
 
-export default function TaskDialog({ open, onClose, onSave, task }) {
+export default function TaskDialog({ open, onClose, onSave, onDelete, task }) {
   const [form, setForm] = useState({ title: '', description: '', skills: [], status: 'backlog', scheduleMode: 'none', scheduleInterval: 1, schedulePeriod: 'days', scheduleTime: '09:00', scheduleCron: '' })
   const [skills, setSkills] = useState([])
 
@@ -372,7 +372,16 @@ export default function TaskDialog({ open, onClose, onSave, task }) {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border shrink-0">
+          {task && onDelete ? (
+            <button
+              onClick={() => { if (window.confirm('Delete this task?')) { onDelete(task.id); onClose() } }}
+              className="px-3 py-2 text-sm rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              Delete
+            </button>
+          ) : <div />}
+          <div className="flex gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm rounded-md bg-secondary hover:bg-accent transition-colors">Cancel</button>
           <button
             onClick={handleSave}
@@ -380,6 +389,7 @@ export default function TaskDialog({ open, onClose, onSave, task }) {
           >
             {task ? 'Update' : 'Create'}
           </button>
+          </div>
         </div>
       </div>
     </div>

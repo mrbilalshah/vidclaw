@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { formatTime, formatDuration, formatRelativeTime } from '@/lib/time'
 import { useTimezone } from '../TimezoneContext'
-import { GripVertical, Trash2, Play, AlertCircle, Loader2, Clock, CheckCircle2, ChevronDown, ChevronUp, FileText } from 'lucide-react'
+import { GripVertical, Trash2, Play, AlertCircle, Loader2, Clock, CheckCircle2, ChevronDown, ChevronUp, FileText, Timer } from 'lucide-react'
 
 function truncateResult(text, maxLen = 120) {
   if (!text) return ''
@@ -19,6 +19,38 @@ export function extractFilePaths(text) {
   const pathRegex = /(?:[\w.\-]+\/)+[\w.\-]+\.[\w]+/g
   const matches = text.match(pathRegex) || []
   return [...new Set(matches)]
+}
+
+function describeSchedule(s) {
+  if (!s) return null
+  if (s === 'daily') return 'Every day'
+  if (s === 'weekly') return 'Every week'
+  if (s === 'monthly') return 'Every month'
+  const parts = s.trim().split(/\s+/)
+  if (parts.length !== 5) return s
+  const [, hour, dom, mon] = parts
+  if (hour === '*') return 'Every hour'
+  if (hour.startsWith('*/')) return `Every ${hour.slice(2)} hours`
+  if (dom.startsWith('*/')) {
+    const n = parseInt(dom.slice(2)) || 1
+    if (n % 7 === 0) return n === 7 ? 'Every week' : `Every ${n / 7} weeks`
+    return n === 1 ? 'Every day' : `Every ${n} days`
+  }
+  if (mon.startsWith('*/')) { const n = parseInt(mon.slice(2)) || 1; return n === 1 ? 'Every month' : `Every ${n} months` }
+  if (dom === '1' && mon === '*') return 'Every month'
+  if (dom === '*' && mon === '*') return 'Every day'
+  return s
+}
+
+function formatNextRun(iso, tz) {
+  if (!iso) return null
+  const d = new Date(iso)
+  const now = new Date()
+  const diffMs = d - now
+  if (diffMs < 0) return 'overdue'
+  if (diffMs < 3600000) return `in ${Math.max(1, Math.round(diffMs / 60000))}m`
+  if (diffMs < 86400000) return `in ${Math.round(diffMs / 3600000)}h`
+  return d.toLocaleDateString('en-US', { timeZone: tz, month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' })
 }
 
 export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDragging: isDraggingProp }) {
@@ -36,6 +68,8 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
   const hasError = !!task.error
   const canRun = task.status === 'backlog' || task.status === 'todo'
   const canEdit = !isDone && !isInProgress
+  const hasSchedule = !!task.schedule
+  const schedulePaused = hasSchedule && task.scheduleEnabled === false
 
   const skillsList = task.skills && task.skills.length ? task.skills : (task.skill ? [task.skill] : [])
   const duration = isDone ? formatDuration(task.startedAt || task.createdAt, task.completedAt) : null
@@ -65,7 +99,9 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
         isInProgress && 'border-amber-500/50 animate-pulse-subtle',
         hasError && 'border-red-500/50',
         isDone && !hasError && 'border-green-500/20 bg-card/60 opacity-80',
-        isDone && hasError && 'bg-card/60 opacity-80'
+        isDone && hasError && 'bg-card/60 opacity-80',
+        hasSchedule && !isDone && !isInProgress && !schedulePaused && 'border-l-2 border-l-orange-400/70',
+        hasSchedule && !isDone && !isInProgress && schedulePaused && 'border-l-2 border-l-orange-400/30'
       )}
       onClick={() => {
         if (isDone && onView) {
@@ -155,6 +191,17 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
           </span>
         )}
       </div>
+
+      {hasSchedule && !isDone && (
+        <div className={cn('flex items-center gap-1 text-[10px] mt-1.5', schedulePaused ? 'text-muted-foreground/50' : 'text-orange-400/80')}>
+          <Timer size={10} className="shrink-0" />
+          <span className={schedulePaused ? 'line-through' : ''}>{describeSchedule(task.schedule)}</span>
+          {!schedulePaused && task.scheduledAt && (
+            <span className="text-muted-foreground">· next: {formatNextRun(task.scheduledAt, timezone)}</span>
+          )}
+          {schedulePaused && <span>· paused</span>}
+        </div>
+      )}
 
       {isInProgress && task.startedAt && (
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1.5">

@@ -4,7 +4,7 @@ import { readTasks, writeTasks, logActivity, readSettings } from '../lib/fileSto
 import { broadcast } from '../broadcast.js';
 import { isoToDateInTz } from '../lib/timezone.js';
 import { WORKSPACE } from '../config.js';
-import { computeNextRun } from '../lib/schedule.js';
+import { computeNextRun, computeFutureRuns } from '../lib/schedule.js';
 
 export function listTasks(req, res) {
   const tasks = readTasks();
@@ -54,7 +54,7 @@ export function updateTask(req, res) {
   if (updates.schedule !== undefined) {
     if (updates.schedule) {
       tasks[idx].scheduledAt = computeNextRun(updates.schedule);
-      if (tasks[idx].scheduleEnabled === undefined) tasks[idx].scheduleEnabled = true;
+      tasks[idx].scheduleEnabled = true;
     } else {
       tasks[idx].scheduledAt = null;
       tasks[idx].scheduleEnabled = false;
@@ -147,15 +147,38 @@ export function completeTask(req, res) {
   const tasks = readTasks();
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
-  tasks[idx].status = 'done';
-  tasks[idx].completedAt = new Date().toISOString();
-  tasks[idx].updatedAt = new Date().toISOString();
-  tasks[idx].result = req.body.result || null;
-  tasks[idx].subagentId = null;
-  tasks[idx].pickedUp = false;
-  if (req.body.error) tasks[idx].error = req.body.error;
+  const now = new Date().toISOString();
+  const hasError = !!req.body.error;
+
+  // If recurring, save run to history and reschedule instead of marking done
+  if (tasks[idx].schedule && tasks[idx].scheduleEnabled !== false) {
+    if (!Array.isArray(tasks[idx].runHistory)) tasks[idx].runHistory = [];
+    tasks[idx].runHistory.push({
+      completedAt: now,
+      startedAt: tasks[idx].startedAt,
+      result: req.body.result || null,
+      error: req.body.error || null,
+    });
+    tasks[idx].status = 'todo';
+    tasks[idx].scheduledAt = computeNextRun(tasks[idx].schedule);
+    tasks[idx].result = req.body.result || null;
+    tasks[idx].error = req.body.error || null;
+    tasks[idx].startedAt = null;
+    tasks[idx].completedAt = null;
+    tasks[idx].subagentId = null;
+    tasks[idx].pickedUp = false;
+    tasks[idx].updatedAt = now;
+  } else {
+    tasks[idx].status = 'done';
+    tasks[idx].completedAt = now;
+    tasks[idx].updatedAt = now;
+    tasks[idx].result = req.body.result || null;
+    tasks[idx].subagentId = null;
+    tasks[idx].pickedUp = false;
+    if (hasError) tasks[idx].error = req.body.error;
+  }
   writeTasks(tasks);
-  logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError: !!req.body.error });
+  logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError });
   broadcast('tasks', tasks);
   res.json(tasks[idx]);
 }
@@ -235,8 +258,26 @@ export function getCalendar(req, res) {
         }
       }
     }
-    // Scheduled / upcoming tasks
-    if (t.scheduledAt && t.status !== 'done') {
+    // Scheduled / upcoming tasks — project future runs for recurring schedules
+    if (t.schedule && t.scheduleEnabled !== false && t.status !== 'done') {
+      try {
+        const runs = computeFutureRuns(t.schedule, 90);
+        for (const run of runs) {
+          const date = isoToDateInTz(run);
+          initDay(date);
+          if (!data[date].scheduled.includes(t.title)) data[date].scheduled.push(t.title);
+        }
+      } catch {}
+      // Also include the immediate next run if not covered
+      if (t.scheduledAt) {
+        try {
+          const date = isoToDateInTz(new Date(t.scheduledAt).toISOString());
+          initDay(date);
+          if (!data[date].scheduled.includes(t.title)) data[date].scheduled.push(t.title);
+        } catch {}
+      }
+    } else if (t.scheduledAt && t.status !== 'done') {
+      // One-off scheduledAt without recurring schedule
       try {
         const date = isoToDateInTz(new Date(t.scheduledAt).toISOString());
         initDay(date);
@@ -276,27 +317,38 @@ export function reportStatusCheck(req, res) {
 
   logActivity('bot', 'task_status_check', { taskId: req.params.id, title: tasks[idx].title, status, message: message || null });
 
-  if (status === 'completed') {
-    tasks[idx].status = 'done';
-    tasks[idx].completedAt = new Date().toISOString();
-    tasks[idx].updatedAt = new Date().toISOString();
-    tasks[idx].result = message || null;
-    tasks[idx].subagentId = null;
-    tasks[idx].pickedUp = false;
-    writeTasks(tasks);
-    broadcast('tasks', tasks);
-    return res.json(tasks[idx]);
-  }
+  if (status === 'completed' || status === 'failed' || status === 'timeout') {
+    const now = new Date().toISOString();
+    const errorMsg = status === 'completed' ? null : (message || (status === 'timeout' ? 'Task timed out' : 'Task failed'));
 
-  if (status === 'failed' || status === 'timeout') {
-    tasks[idx].status = 'done';
-    tasks[idx].completedAt = new Date().toISOString();
-    tasks[idx].updatedAt = new Date().toISOString();
-    tasks[idx].error = message || (status === 'timeout' ? 'Task timed out' : 'Task failed');
-    tasks[idx].subagentId = null;
-    tasks[idx].pickedUp = false;
+    if (tasks[idx].schedule && tasks[idx].scheduleEnabled !== false) {
+      if (!Array.isArray(tasks[idx].runHistory)) tasks[idx].runHistory = [];
+      tasks[idx].runHistory.push({
+        completedAt: now,
+        startedAt: tasks[idx].startedAt,
+        result: status === 'completed' ? (message || null) : null,
+        error: errorMsg,
+      });
+      tasks[idx].status = 'todo';
+      tasks[idx].scheduledAt = computeNextRun(tasks[idx].schedule);
+      tasks[idx].result = status === 'completed' ? (message || null) : null;
+      tasks[idx].error = errorMsg;
+      tasks[idx].startedAt = null;
+      tasks[idx].completedAt = null;
+      tasks[idx].subagentId = null;
+      tasks[idx].pickedUp = false;
+      tasks[idx].updatedAt = now;
+    } else {
+      tasks[idx].status = 'done';
+      tasks[idx].completedAt = now;
+      tasks[idx].updatedAt = now;
+      tasks[idx].result = status === 'completed' ? (message || null) : null;
+      tasks[idx].error = errorMsg;
+      tasks[idx].subagentId = null;
+      tasks[idx].pickedUp = false;
+    }
     writeTasks(tasks);
-    logActivity('bot', 'task_timeout', { taskId: req.params.id, title: tasks[idx].title, message: message || null });
+    if (status !== 'completed') logActivity('bot', 'task_timeout', { taskId: req.params.id, title: tasks[idx].title, message: message || null });
     broadcast('tasks', tasks);
     return res.json(tasks[idx]);
   }

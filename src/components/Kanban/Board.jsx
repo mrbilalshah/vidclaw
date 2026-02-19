@@ -206,11 +206,11 @@ export default function Board() {
     fetchTasks()
   }
 
-  async function handleQuickAdd(status, title, skills = []) {
+  async function handleQuickAdd(status, title, skills = [], schedule = null) {
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, status, skills, skill: skills[0] || '' }),
+      body: JSON.stringify({ title, status, skills, skill: skills[0] || '', schedule }),
     })
     fetchTasks()
   }
@@ -261,6 +261,7 @@ export default function Board() {
         open={dialogOpen}
         onClose={() => { setDialogOpen(false); setEditTask(null) }}
         onSave={handleSave}
+        onDelete={handleDelete}
         task={editTask}
       />
       <TaskDetailDialog
