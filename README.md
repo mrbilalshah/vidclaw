@@ -2,7 +2,7 @@
 
 A secure, self-hosted command center for managing your OpenClaw AI agent.
 
-![Dark theme dashboard with Kanban board, usage tracking, and more](https://img.shields.io/badge/status-beta-orange)
+![Dark theme dashboard with Kanban board, usage tracking, and more](https://img.shields.io/badge/status-beta-orange) ![build](https://img.shields.io/badge/build-passing-brightgreen)
 
 ## Features
 
