@@ -61,66 +61,64 @@
     <p class="subtitle">All notable updates to VidClaw, the <a href="/features">self-hosted AI dashboard</a> for <a href="/docs">OpenClaw agent management</a>.</p>
 
     <div class="release">
-      <h2>v1.5.0 <span class="tag tag-new">New</span></h2>
-      <div class="date">February 2025</div>
+      <h2>v1.0.6 <span class="tag tag-new">New</span><span class="tag tag-fix">Fix</span></h2>
+      <div class="date">February 18, 2026</div>
       <ul>
-        <li>Added <strong>credentials manager</strong> for secure secret storage</li>
-        <li>New "Delete All Done" bulk action for the Kanban board</li>
-        <li>Improved task card display for completed items</li>
-        <li>Better memory management panel</li>
+        <li>All task deletes are now <strong>soft deletes</strong> (archived, not removed)</li>
+        <li>Added "Clear All" button for the Done column</li>
+        <li>Fix: SkillsManager uses relative URLs (<a href="https://github.com/madrzak/vidclaw/issues/29">#29</a>)</li>
       </ul>
     </div>
 
     <div class="release">
-      <h2>v1.4.0 <span class="tag tag-improved">Improved</span></h2>
-      <div class="date">January 2025</div>
+      <h2>v1.0.5 <span class="tag tag-new">New</span><span class="tag tag-improved">Improved</span></h2>
+      <div class="date">February 18, 2026</div>
       <ul>
-        <li>SEO improvements — optimized <code>robots.txt</code> and <code>sitemap.xml</code></li>
-        <li>Optimized README for discoverability</li>
-        <li>Cross-platform setup script (Linux + macOS)</li>
+        <li>Added <strong>Tailscale Serve</strong> integration for secure remote access</li>
+        <li>Cross-platform setup — macOS launchd support alongside Linux systemd</li>
+        <li>Hardened service scripts and CI security safeguards</li>
+        <li>Fix: upgrade Vite to v7 and react-syntax-highlighter to v16</li>
+        <li>Fix: npm vulnerability patches</li>
       </ul>
     </div>
 
     <div class="release">
-      <h2>v1.3.0 <span class="tag tag-new">New</span></h2>
-      <div class="date">December 2024</div>
+      <h2>v1.0.4 <span class="tag tag-improved">Improved</span></h2>
+      <div class="date">February 18, 2026</div>
       <ul>
-        <li><strong>AI cost tracking</strong> panel with per-model breakdowns</li>
-        <li>Rate limit progress bars matching Anthropic's windows</li>
-        <li>Model switching from the navbar</li>
-        <li>Daily and monthly spending summaries</li>
+        <li>OpenClaw version check is now manual instead of running on page load</li>
       </ul>
     </div>
 
     <div class="release">
-      <h2>v1.2.0 <span class="tag tag-new">New</span></h2>
-      <div class="date">November 2024</div>
+      <h2>v1.0.2 <span class="tag tag-improved">Improved</span></h2>
+      <div class="date">February 18, 2026</div>
       <ul>
-        <li>Skills Manager — browse, enable, disable, and create skills</li>
-        <li>Soul Editor with version history and starter templates</li>
-        <li>Content browser with markdown preview</li>
+        <li>Auto-refresh countdown after VidClaw self-update</li>
       </ul>
     </div>
 
     <div class="release">
-      <h2>v1.1.0 <span class="tag tag-improved">Improved</span></h2>
-      <div class="date">October 2024</div>
+      <h2>v1.0.1 <span class="tag tag-fix">Fix</span></h2>
+      <div class="date">February 18, 2026</div>
       <ul>
-        <li>Activity calendar view parsed from memory files</li>
-        <li>Task priority levels (P1–P4)</li>
-        <li>Drag-and-drop improvements on mobile</li>
+        <li>Fix: suppress detached HEAD warning in <code>update.sh</code></li>
       </ul>
     </div>
 
     <div class="release">
       <h2>v1.0.0</h2>
-      <div class="date">September 2024</div>
+      <div class="date">February 18, 2026</div>
       <ul>
         <li>Initial release of VidClaw</li>
-        <li>Kanban task board with four columns</li>
-        <li>Basic usage tracking</li>
-        <li>SSH tunnel security model</li>
-        <li>One-command setup via <code>setup.sh</code></li>
+        <li>Kanban task board with drag-and-drop across four columns</li>
+        <li>Recurring and scheduled tasks with calendar integration</li>
+        <li>File browser with sorting and metadata display</li>
+        <li>Skills Manager, Soul Editor with version history</li>
+        <li>AI usage tracking with per-model cost breakdowns</li>
+        <li>Dark/light theme toggle</li>
+        <li>Activity timeline and heartbeat monitoring</li>
+        <li>One-command setup via <code>setup.sh</code>, SSH tunnel security model</li>
       </ul>
     </div>
 
