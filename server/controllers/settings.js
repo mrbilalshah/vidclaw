@@ -28,7 +28,7 @@ export async function postSettings(req, res) {
 
     if (timezone) {
       const valid = Intl.supportedValuesOf('timeZone');
-      if (!valid.includes(timezone)) {
+      if (timezone !== 'UTC' && !valid.includes(timezone)) {
         return res.status(400).json({ error: 'Invalid timezone' });
       }
     }
