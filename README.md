@@ -36,29 +36,11 @@ Then open `http://localhost:3333` (SSH) or `https://your-machine.your-tailnet.ts
 
 ## Install
 
-**One-liner** (installs everything including Tailscale):
-
 ```bash
 curl -fsSL vidclaw.com/install.sh | bash
 ```
 
-Without Tailscale (localhost only):
-
-```bash
-curl -fsSL vidclaw.com/install.sh | bash -s -- --no-tailscale
-```
-
-**Manual install:**
-
-```bash
-cd ~/.openclaw/workspace
-git clone https://github.com/madrzak/vidclaw.git dashboard
-cd dashboard
-./setup.sh                  # localhost-only
-./setup.sh --tailscale      # with Tailscale Serve on port 8443
-```
-
-`setup.sh` is idempotent — safe to re-run. Run `./doctor.sh` to verify your environment.
+Installs Node.js, git, Tailscale, and VidClaw in one command. Localhost only: add `--no-tailscale`.
 
 ## Update
 
