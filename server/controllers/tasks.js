@@ -4,6 +4,7 @@ import { readTasks, writeTasks, logActivity, readSettings } from '../lib/fileSto
 import { broadcast } from '../broadcast.js';
 import { isoToDateInTz } from '../lib/timezone.js';
 import { WORKSPACE } from '../config.js';
+import { computeNextRun } from '../lib/schedule.js';
 
 export function listTasks(req, res) {
   const tasks = readTasks();

@@ -118,7 +118,7 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
         value={title}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder="Enter a title... (type @ for skills)"
+        placeholder="Enter a task... (type @ for skills)"
         rows={1}
         style={{ overflow: 'hidden' }}
         className="w-full bg-secondary/80 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/25"

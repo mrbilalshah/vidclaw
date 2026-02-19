@@ -54,7 +54,7 @@ function computeNextCron(expr, from) {
       const s = parseInt(step);
       const vals = [];
       for (let i = min; i <= max; i++) {
-        if (i % s === 0) vals.push(i);
+        if ((i - min) % s === 0) vals.push(i);
       }
       return vals;
     }
