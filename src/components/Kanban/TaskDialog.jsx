@@ -216,9 +216,8 @@ export default function TaskDialog({ open, onClose, onSave, onDelete, task }) {
 
   const refreshAttachments = () => {
     if (!task?.id) return
-    fetch(`/api/tasks`).then(r => r.json()).then(tasks => {
-      const t = tasks.find(t => t.id === task.id)
-      if (t) setAttachments(t.attachments || [])
+    fetch(`/api/tasks/${task.id}/attachments`).then(r => r.json()).then(atts => {
+      if (Array.isArray(atts)) setAttachments(atts)
     }).catch(() => {})
     setAttKey(k => k + 1)
   }

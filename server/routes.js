@@ -16,7 +16,7 @@ import { listFiles, getFileContent, downloadFile, getWorkspaceFile, putWorkspace
 import { getSoul, putSoul, getSoulHistory, revertSoul, getSoulTemplates } from './controllers/soul.js';
 import { getSettings, postSettings } from './controllers/settings.js';
 import { getVidclawVersion, updateVidclaw } from './controllers/vidclaw.js';
-import { uploadAttachment, serveAttachment, deleteAttachment } from './controllers/attachments.js';
+import { uploadAttachment, serveAttachment, deleteAttachment, listAttachments } from './controllers/attachments.js';
 import { listCredentials, putCredential, deleteCredential } from './controllers/credentials.js';
 
 const router = Router();
@@ -38,6 +38,7 @@ router.post('/api/tasks/:id/complete', completeTask);
 router.post('/api/tasks/:id/status-check', reportStatusCheck);
 router.get('/api/tasks/:id/history', getRunHistory);
 router.post('/api/tasks/:id/schedule-toggle', toggleSchedule);
+router.get('/api/tasks/:id/attachments', listAttachments);
 router.post('/api/tasks/:id/attachments', uploadAttachment);
 router.get('/api/tasks/:id/attachments/:filename', serveAttachment);
 router.delete('/api/tasks/:id/attachments/:filename', deleteAttachment);

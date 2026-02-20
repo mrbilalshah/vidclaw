@@ -9,11 +9,33 @@ const ATTACHMENTS_DIR = path.join(__dirname, 'data', 'attachments');
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_TASK_SIZE = 20 * 1024 * 1024; // 20MB
 
+// Allowed MIME types for uploads
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'application/pdf',
+  'text/plain', 'text/csv', 'text/markdown',
+  'application/json',
+  'application/zip', 'application/gzip',
+  'video/mp4', 'video/webm',
+  'audio/mpeg', 'audio/wav', 'audio/ogg',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+
+// Blocked file extensions (executables)
+const BLOCKED_EXTENSIONS = new Set(['.exe', '.sh', '.bat', '.cmd', '.msi', '.com', '.scr', '.pif', '.ps1']);
+
+/** Validate that an ID/filename param is safe (no path traversal) */
+function isSafeParam(value) {
+  return typeof value === 'string' && value.length > 0 && !value.includes('/') && !value.includes('\\') && !value.includes('..');
+}
+
 // Ensure attachments root exists
 fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination(req, _file, cb) {
+    if (!isSafeParam(req.params.id)) return cb(new Error('Invalid task ID'));
     const dir = path.join(ATTACHMENTS_DIR, req.params.id);
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
@@ -26,9 +48,21 @@ const storage = multer.diskStorage({
   },
 });
 
+function fileFilter(_req, file, cb) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (BLOCKED_EXTENSIONS.has(ext)) {
+    return cb(new Error('File type not allowed'));
+  }
+  if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+    return cb(new Error('File type not allowed'));
+  }
+  cb(null, true);
+}
+
 export const upload = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter,
 }).single('file');
 
 function getTask(id) {
@@ -43,12 +77,15 @@ function taskTotalSize(task) {
 }
 
 export function uploadAttachment(req, res) {
+  if (!isSafeParam(req.params.id)) return res.status(400).json({ error: 'Invalid task ID' });
+
   const { tasks, idx, task } = getTask(req.params.id);
   if (!task) return res.status(404).json({ error: 'Task not found' });
 
   upload(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File exceeds 5MB limit' });
+      if (err.message === 'File type not allowed') return res.status(400).json({ error: 'File type not allowed' });
       return res.status(500).json({ error: err.message });
     }
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
@@ -84,22 +121,33 @@ export function uploadAttachment(req, res) {
 }
 
 export function serveAttachment(req, res) {
+  if (!isSafeParam(req.params.id)) return res.status(400).json({ error: 'Invalid task ID' });
+  if (!isSafeParam(req.params.filename)) return res.status(400).json({ error: 'Invalid filename' });
+
   const { task } = getTask(req.params.id);
   if (!task) return res.status(404).json({ error: 'Task not found' });
 
   const filename = req.params.filename;
-  const filePath = path.join(ATTACHMENTS_DIR, req.params.id, filename);
+  const taskDir = path.resolve(path.join(ATTACHMENTS_DIR, req.params.id));
+  const filePath = path.resolve(path.join(taskDir, filename));
 
-  // Security: ensure we stay within task dir
-  if (!filePath.startsWith(path.join(ATTACHMENTS_DIR, req.params.id))) {
+  // Security: ensure resolved path stays within task dir
+  if (!filePath.startsWith(taskDir + path.sep)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
 
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+  // Security headers to prevent XSS via uploaded HTML/SVG
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
   res.sendFile(filePath);
 }
 
 export function deleteAttachment(req, res) {
+  if (!isSafeParam(req.params.id)) return res.status(400).json({ error: 'Invalid task ID' });
+  if (!isSafeParam(req.params.filename)) return res.status(400).json({ error: 'Invalid filename' });
+
   const tasks = readTasks();
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Task not found' });
@@ -111,8 +159,12 @@ export function deleteAttachment(req, res) {
   const ai = task.attachments.findIndex(a => a.filename === filename);
   if (ai === -1) return res.status(404).json({ error: 'Attachment not found' });
 
-  // Remove file
-  const filePath = path.join(ATTACHMENTS_DIR, req.params.id, filename);
+  // Remove file — verify path stays within task attachments dir
+  const taskDir = path.resolve(path.join(ATTACHMENTS_DIR, req.params.id));
+  const filePath = path.resolve(path.join(taskDir, filename));
+  if (!filePath.startsWith(taskDir + path.sep)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
   try { fs.unlinkSync(filePath); } catch {}
 
   task.attachments.splice(ai, 1);
@@ -120,6 +172,13 @@ export function deleteAttachment(req, res) {
   writeTasks(tasks);
   broadcast('tasks', tasks.filter(t => t.status !== 'archived'));
   res.json({ ok: true });
+}
+
+export function listAttachments(req, res) {
+  if (!isSafeParam(req.params.id)) return res.status(400).json({ error: 'Invalid task ID' });
+  const { task } = getTask(req.params.id);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  res.json(task.attachments || []);
 }
 
 // Cleanup attachments dir when task is deleted
