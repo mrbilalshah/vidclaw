@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { formatTime, formatDuration, formatRelativeTime } from '@/lib/time'
 import { useTimezone } from '../TimezoneContext'
-import { GripVertical, Trash2, Play, AlertCircle, Loader2, Clock, CheckCircle2, ChevronDown, ChevronUp, FileText, Timer, Paperclip } from 'lucide-react'
+import { GripVertical, Trash2, Play, AlertCircle, Loader2, Clock, CheckCircle2, ChevronDown, ChevronUp, FileText, Timer, Paperclip, MessageCircle } from 'lucide-react'
 import { AttachmentBadge, AttachmentThumbnails } from './AttachmentSection'
 
 function truncateResult(text, maxLen = 120) {
@@ -186,6 +186,11 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
             isDone && !hasError ? 'bg-orange-500/10 text-orange-400/60' : 'bg-orange-500/20 text-orange-400'
           )}>{sk}</span>
         ))}
+        {task.channel && (
+          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+            <MessageCircle size={10} /> {task.channel}
+          </span>
+        )}
         {hasError && !isDone && (
           <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">
             <AlertCircle size={10} /> Error

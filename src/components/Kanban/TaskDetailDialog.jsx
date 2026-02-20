@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X, Bot, User, Activity, FileText, AlertCircle, Clock, CheckCircle2, Loader2 } from 'lucide-react'
+import { X, Bot, User, Activity, FileText, AlertCircle, Clock, CheckCircle2, Loader2, MessageCircle } from 'lucide-react'
 import AttachmentSection from './AttachmentSection'
 import { cn } from '@/lib/utils'
 import { extractFilePaths } from './TaskCard'
@@ -154,11 +154,16 @@ export default function TaskDetailDialog({ open, onClose, task }) {
               {isDone && hasError && <AlertCircle size={16} className="text-red-400 shrink-0" />}
               <h2 className="text-lg font-semibold">{task.title}</h2>
             </div>
-            {skillsList.length > 0 && (
+            {(skillsList.length > 0 || task.channel) && (
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                 {skillsList.map(sk => (
                   <span key={sk} className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">{sk}</span>
                 ))}
+                {task.channel && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                    <MessageCircle size={10} /> {task.channel}
+                  </span>
+                )}
               </div>
             )}
             {(task.startedAt || task.completedAt) && (
