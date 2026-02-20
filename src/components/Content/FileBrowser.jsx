@@ -199,7 +199,7 @@ export default function FileBrowser() {
           }
         }
       })
-      .catch(() => {})
+      .catch(() => alert('Failed to delete'))
   }
 
   function handleContextMenu(e, entry) {

@@ -76,11 +76,17 @@ export function getWorkspaceFileHistory(req, res) {
   res.json(readHistoryFile(path.join(__dirname, 'data', `${name}-history.json`)));
 }
 
-// Validate path is within workspace (handles trailing slash edge case)
+// Validate path is within workspace (resolves symlinks to prevent escape)
 function isPathWithinWorkspace(fullPath) {
   const resolvedWorkspace = path.resolve(WORKSPACE) + path.sep;
-  const resolvedPath = path.resolve(fullPath);
-  return resolvedPath.startsWith(resolvedWorkspace) || resolvedPath === path.resolve(WORKSPACE);
+  try {
+    const resolvedPath = fs.realpathSync(path.resolve(fullPath));
+    return resolvedPath.startsWith(resolvedWorkspace) || resolvedPath === path.resolve(WORKSPACE);
+  } catch {
+    // File doesn't exist yet (e.g. new file write) — fall back to resolve-only check
+    const resolvedPath = path.resolve(fullPath);
+    return resolvedPath.startsWith(resolvedWorkspace) || resolvedPath === path.resolve(WORKSPACE);
+  }
 }
 
 export function putFileContent(req, res) {
@@ -129,5 +135,8 @@ export function deleteFile(req, res) {
       fs.unlinkSync(fullPath);
     }
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (e.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
+    res.status(500).json({ error: e.message });
+  }
 }
