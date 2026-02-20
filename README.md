@@ -74,4 +74,4 @@ MIT
 
 ---
 
-Copyright (c) 2026 [woocassh](https://x.com/woocassh) · [GitHub](https://github.com/madrzak/vidclaw) · MIT License
+Copyright (c) 2026 [woocassh](https://x.com/woocassh) · MIT License
