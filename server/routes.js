@@ -4,7 +4,7 @@ import { __dirname } from './config.js';
 
 import { getActivity, getTime } from './controllers/activity.js';
 import {
-  listTasks, createTask, updateTask, reorderTasks,
+  listTasks, createTask, createTaskFromConversation, updateTask, reorderTasks,
   runTask, getTaskQueue, pickupTask, completeTask, deleteTask, bulkDeleteTasks,
   getCalendar, getRunHistory, toggleSchedule, getCapacity, reportStatusCheck,
 } from './controllers/tasks.js';
@@ -27,6 +27,7 @@ router.get('/api/time', getTime);
 // Tasks
 router.get('/api/tasks', listTasks);
 router.post('/api/tasks', createTask);
+router.post('/api/tasks/from-conversation', createTaskFromConversation);
 router.put('/api/tasks/:id', updateTask);
 router.post('/api/tasks/reorder', reorderTasks);
 router.post('/api/tasks/:id/run', runTask);

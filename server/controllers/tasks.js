@@ -33,10 +33,47 @@ export function createTask(req, res) {
     startedAt: null,
     error: null,
     order: req.body.order ?? tasks.filter(t => t.status === (req.body.status || 'backlog')).length,
+    source: req.body.source || null,
+    sourceMessageId: req.body.sourceMessageId || null,
   };
   tasks.push(task);
   writeTasks(tasks);
   logActivity('user', 'task_created', { taskId: task.id, title: task.title });
+  broadcast('tasks', tasks);
+  res.json(task);
+}
+
+export function createTaskFromConversation(req, res) {
+  const tasks = readTasks();
+  const now = new Date().toISOString();
+  const autoStart = req.body.autoStart === true;
+  const task = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title: req.body.title || 'Untitled',
+    description: req.body.description || '',
+    priority: req.body.priority || 'medium',
+    skill: '',
+    skills: [],
+    status: autoStart ? 'in-progress' : 'backlog',
+    createdAt: now,
+    updatedAt: now,
+    completedAt: null,
+    schedule: null,
+    scheduledAt: null,
+    scheduleEnabled: false,
+    runHistory: [],
+    result: null,
+    startedAt: autoStart ? now : null,
+    error: null,
+    order: tasks.filter(t => t.status === (autoStart ? 'in-progress' : 'backlog')).length,
+    source: req.body.source || null,
+    sourceMessageId: req.body.sourceMessageId || null,
+    subagentId: req.body.subagentId || null,
+    pickedUp: autoStart ? true : false,
+  };
+  tasks.push(task);
+  writeTasks(tasks);
+  logActivity('bot', 'task_created', { taskId: task.id, title: task.title, source: task.source });
   broadcast('tasks', tasks);
   res.json(task);
 }
@@ -46,7 +83,7 @@ export function updateTask(req, res) {
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
   const wasNotDone = tasks[idx].status !== 'done';
-  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order', 'subagentId'];
+  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order', 'subagentId', 'source', 'sourceMessageId'];
   const updates = {};
   for (const k of allowedFields) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
   tasks[idx] = { ...tasks[idx], ...updates, updatedAt: new Date().toISOString() };

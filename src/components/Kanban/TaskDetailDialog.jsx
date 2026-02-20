@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X, Bot, User, Activity, FileText, AlertCircle, Clock, CheckCircle2, Loader2 } from 'lucide-react'
+import { X, Bot, User, Activity, FileText, AlertCircle, Clock, CheckCircle2, Loader2, MessageCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { extractFilePaths } from './TaskCard'
 import { useTimezone } from '../TimezoneContext'
@@ -150,6 +150,13 @@ export default function TaskDetailDialog({ open, onClose, task }) {
                 <span>Started {formatTime(task.startedAt || task.createdAt, timezone)}</span>
                 {duration && <span className="text-green-400 font-medium flex items-center gap-0.5"><Clock size={10} />{duration}</span>}
                 {isInProgress && elapsed && <span className="text-amber-400 font-medium flex items-center gap-0.5"><Clock size={10} />{elapsed}</span>}
+              </div>
+            )}
+            {task.source && (
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
+                <MessageCircle size={12} className="text-blue-400" />
+                <span>Source: <span className="text-blue-400 font-medium">{task.source}</span></span>
+                {task.sourceMessageId && <span className="text-muted-foreground/60">#{task.sourceMessageId}</span>}
               </div>
             )}
           </div>
