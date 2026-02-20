@@ -191,6 +191,11 @@ export default function TaskCard({ task, onEdit, onView, onDelete, onRun, isDrag
             <MessageCircle size={10} /> {task.channel}
           </span>
         )}
+        {task.source && (
+          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400" title={`Source: ${task.source}`}>
+            <MessageCircle size={10} /> {task.source}
+          </span>
+        )}
         {hasError && !isDone && (
           <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">
             <AlertCircle size={10} /> Error

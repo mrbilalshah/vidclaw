@@ -239,6 +239,13 @@ export default function TaskDetailDialog({ open, onClose, task }) {
                 {isInProgress && elapsed && <span className="text-amber-400 font-medium flex items-center gap-0.5"><Clock size={10} />{elapsed}</span>}
               </div>
             )}
+            {task.source && (
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
+                <MessageCircle size={12} className="text-blue-400" />
+                <span>Source: <span className="text-blue-400 font-medium">{task.source}</span></span>
+                {task.sourceMessageId && <span className="text-muted-foreground/60">#{task.sourceMessageId}</span>}
+              </div>
+            )}
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 ml-3"><X size={18} /></button>
         </div>
