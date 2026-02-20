@@ -157,8 +157,58 @@ function SkillPicker({ selectedSkills, onChange, allSkills }) {
   )
 }
 
-export default function TaskDialog({ open, onClose, onSave, task }) {
-  const [form, setForm] = useState({ title: '', description: '', skills: [], status: 'backlog' })
+function parseSchedule(s) {
+  const defaults = { mode: 'none', interval: 1, period: 'days', time: '09:00', cron: '' }
+  if (!s) return defaults
+  if (s === 'daily') return { ...defaults, mode: 'interval', interval: 1, period: 'days', time: '00:00' }
+  if (s === 'weekly') return { ...defaults, mode: 'interval', interval: 1, period: 'weeks', time: '00:00' }
+  if (s === 'monthly') return { ...defaults, mode: 'interval', interval: 1, period: 'months', time: '00:00' }
+
+  const parts = s.trim().split(/\s+/)
+  if (parts.length === 5) {
+    const [min, hour, dom, mon, dow] = parts
+    const m = parseInt(min), h = parseInt(hour)
+    const pad = n => String(n).padStart(2, '0')
+
+    if (!isNaN(m) && dom === '*' && mon === '*' && dow === '*') {
+      if (hour === '*') return { ...defaults, mode: 'interval', interval: 1, period: 'hours' }
+      if (hour.startsWith('*/')) return { ...defaults, mode: 'interval', interval: parseInt(hour.slice(2)) || 1, period: 'hours' }
+    }
+
+    if (!isNaN(m) && !isNaN(h)) {
+      const t = `${pad(h)}:${pad(m)}`
+      if (dom === '1' && mon.startsWith('*/') && dow === '*')
+        return { ...defaults, mode: 'interval', interval: parseInt(mon.slice(2)) || 1, period: 'months', time: t }
+      if (dom === '1' && mon === '*' && dow === '*')
+        return { ...defaults, mode: 'interval', interval: 1, period: 'months', time: t }
+      if (dom.startsWith('*/') && mon === '*' && dow === '*') {
+        const n = parseInt(dom.slice(2)) || 1
+        if (n % 7 === 0) return { ...defaults, mode: 'interval', interval: n / 7, period: 'weeks', time: t }
+        return { ...defaults, mode: 'interval', interval: n, period: 'days', time: t }
+      }
+      if (dom === '*' && mon === '*' && dow === '*')
+        return { ...defaults, mode: 'interval', interval: 1, period: 'days', time: t }
+    }
+  }
+
+  return { ...defaults, mode: 'cron', cron: s }
+}
+
+function buildScheduleString({ scheduleInterval, schedulePeriod, scheduleTime }) {
+  const [hh, mm] = (scheduleTime || '09:00').split(':').map(s => parseInt(s) || 0)
+  const n = Math.max(1, parseInt(scheduleInterval) || 1)
+
+  switch (schedulePeriod) {
+    case 'hours': return n === 1 ? '0 * * * *' : `0 */${n} * * *`
+    case 'days': return n === 1 ? `${mm} ${hh} * * *` : `${mm} ${hh} */${n} * *`
+    case 'weeks': return `${mm} ${hh} */${n * 7} * *`
+    case 'months': return n === 1 ? `${mm} ${hh} 1 * *` : `${mm} ${hh} 1 */${n} *`
+    default: return ''
+  }
+}
+
+export default function TaskDialog({ open, onClose, onSave, onDelete, task }) {
+  const [form, setForm] = useState({ title: '', description: '', skills: [], status: 'backlog', scheduleMode: 'none', scheduleInterval: 1, schedulePeriod: 'days', scheduleTime: '09:00', scheduleCron: '' })
   const [skills, setSkills] = useState([])
 
   useEffect(() => {
@@ -168,17 +218,29 @@ export default function TaskDialog({ open, onClose, onSave, task }) {
   useEffect(() => {
     if (task) {
       const taskSkills = task.skills && task.skills.length ? task.skills : (task.skill ? [task.skill] : [])
-      setForm({ title: task.title, description: task.description, skills: taskSkills, status: task.status })
+      const sched = parseSchedule(task.schedule)
+      setForm({ title: task.title, description: task.description, skills: taskSkills, status: task.status, scheduleMode: sched.mode, scheduleInterval: sched.interval, schedulePeriod: sched.period, scheduleTime: sched.time, scheduleCron: sched.cron })
     } else {
-      setForm({ title: '', description: '', skills: [], status: 'backlog' })
+      setForm({ title: '', description: '', skills: [], status: 'backlog', scheduleMode: 'none', scheduleInterval: 1, schedulePeriod: 'days', scheduleTime: '09:00', scheduleCron: '' })
     }
   }, [task, open])
+
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [open, onClose])
 
   if (!open) return null
 
   function handleSave() {
     if (!form.title) return
-    const data = { ...form, skill: form.skills[0] || '', schedule: null }
+    const schedule = form.scheduleMode === 'cron' ? form.scheduleCron
+      : form.scheduleMode === 'interval' ? buildScheduleString(form)
+      : null
+    const { scheduleMode, scheduleInterval, schedulePeriod, scheduleTime, scheduleCron, ...rest } = form
+    const data = { ...rest, skill: rest.skills[0] || '', schedule }
     onSave(data)
   }
 
@@ -232,6 +294,72 @@ export default function TaskDialog({ open, onClose, onSave, task }) {
             </div>
 
             <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Schedule</label>
+              <select
+                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm outline-none"
+                value={form.scheduleMode === 'cron' ? 'cron' : form.scheduleMode}
+                onChange={e => {
+                  const mode = e.target.value
+                  if (mode === 'none') setForm(f => ({ ...f, scheduleMode: 'none' }))
+                  else setForm(f => ({ ...f, scheduleMode: 'interval' }))
+                }}
+              >
+                <option value="none">None</option>
+                <option value="interval">Repeat...</option>
+                {form.scheduleMode === 'cron' && <option value="cron">Custom (cron)</option>}
+              </select>
+
+              {form.scheduleMode === 'interval' && (
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <span className="text-xs text-muted-foreground">Every</span>
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-16 bg-secondary border border-border rounded-md px-2 py-1.5 text-sm outline-none text-center"
+                    value={form.scheduleInterval}
+                    onChange={e => setForm(f => ({ ...f, scheduleInterval: Math.max(1, parseInt(e.target.value) || 1) }))}
+                  />
+                  <select
+                    className="bg-secondary border border-border rounded-md px-2 py-1.5 text-sm outline-none"
+                    value={form.schedulePeriod}
+                    onChange={e => setForm(f => ({ ...f, schedulePeriod: e.target.value }))}
+                  >
+                    <option value="hours">hour(s)</option>
+                    <option value="days">day(s)</option>
+                    <option value="weeks">week(s)</option>
+                    <option value="months">month(s)</option>
+                  </select>
+                  {form.schedulePeriod !== 'hours' && (
+                    <>
+                      <span className="text-xs text-muted-foreground">at</span>
+                      <input
+                        type="time"
+                        className="bg-secondary border border-border rounded-md px-2 py-1.5 text-sm outline-none [color-scheme:dark]"
+                        value={form.scheduleTime}
+                        onChange={e => setForm(f => ({ ...f, scheduleTime: e.target.value }))}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+
+              {form.scheduleMode === 'cron' && (
+                <div className="flex items-center gap-2 mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Cron: <code className="bg-secondary/80 px-1.5 py-0.5 rounded text-foreground">{form.scheduleCron}</code>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, scheduleMode: 'interval', scheduleCron: '' }))}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div>
               <label className="text-xs text-muted-foreground mb-1 block">Skills</label>
               <SkillPicker
                 selectedSkills={form.skills}
@@ -251,7 +379,16 @@ export default function TaskDialog({ open, onClose, onSave, task }) {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border shrink-0">
+          {task && onDelete ? (
+            <button
+              onClick={() => { if (window.confirm('Delete this task?')) { onDelete(task.id); onClose() } }}
+              className="px-3 py-2 text-sm rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              Delete
+            </button>
+          ) : <div />}
+          <div className="flex gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm rounded-md bg-secondary hover:bg-accent transition-colors">Cancel</button>
           <button
             onClick={handleSave}
@@ -259,6 +396,7 @@ export default function TaskDialog({ open, onClose, onSave, task }) {
           >
             {task ? 'Update' : 'Create'}
           </button>
+          </div>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 A secure, self-hosted command center for managing your OpenClaw AI agent.
 
-![Dark theme dashboard with Kanban board, usage tracking, and more](https://img.shields.io/badge/status-beta-orange)
+![Dark theme dashboard with Kanban board, usage tracking, and more](https://img.shields.io/badge/status-beta-orange) ![build](https://img.shields.io/badge/build-passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue)
 
 ## Features
 
@@ -19,14 +19,9 @@ A secure, self-hosted command center for managing your OpenClaw AI agent.
 
 VidClaw binds to localhost only (`127.0.0.1:3333`) — no external network calls, all data stays on your machine.
 
-Two ways to access from another device:
+Remote access is handled via **Tailscale Serve** (enabled by default on port 8443). Alternatively, use an SSH tunnel: `ssh -L 3333:localhost:3333 <user>@<server>`.
 
-| Method | Command |
-|--------|---------|
-| **SSH tunnel** | `ssh -L 3333:localhost:3333 <user>@<server>` |
-| **Tailscale Serve** | Pass `--tailscale` to `setup.sh` (see Install) |
-
-Then open `http://localhost:3333` (SSH) or `https://your-machine.your-tailnet.ts.net:8443` (Tailscale).
+Then open `https://your-machine.your-tailnet.ts.net:8443` (Tailscale) or `http://localhost:3333` (SSH).
 
 ## Prerequisites
 
@@ -37,14 +32,10 @@ Then open `http://localhost:3333` (SSH) or `https://your-machine.your-tailnet.ts
 ## Install
 
 ```bash
-cd ~/.openclaw/workspace
-git clone https://github.com/madrzak/vidclaw.git dashboard
-cd dashboard
-./setup.sh                  # localhost-only
-./setup.sh --tailscale      # with Tailscale Serve on port 8443
+curl -fsSL vidclaw.com/install.sh | bash
 ```
 
-`setup.sh` is idempotent — safe to re-run. Run `./doctor.sh` to verify your environment.
+Installs Node.js, git, Tailscale, and VidClaw in one command. Localhost only: add `--no-tailscale`.
 
 ## Update
 
@@ -83,4 +74,4 @@ MIT
 
 ---
 
-Copyright (c) 2026 [woocassh](https://x.com/woocassh) · [GitHub](https://github.com/madrzak/vidclaw) · MIT License
+Copyright (c) 2026 [woocassh](https://x.com/woocassh) · MIT License

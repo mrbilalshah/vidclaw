@@ -3,6 +3,7 @@ import { X, Bot, User, Activity, FileText, AlertCircle, Clock, CheckCircle2, Loa
 import { cn } from '@/lib/utils'
 import { extractFilePaths } from './TaskCard'
 import { useTimezone } from '../TimezoneContext'
+import { useNav } from '@/hooks/useNav'
 
 function formatTime(iso, tz) {
   if (!iso) return ''
@@ -40,6 +41,8 @@ const ACTION_LABELS = {
   task_pickup: 'Picked up task',
   task_completed: 'Completed task',
   task_deleted: 'Deleted task',
+  task_status_check: 'Checked sub-agent',
+  task_timeout: 'Task timed out',
 }
 
 function ActivityLog({ taskId }) {
@@ -92,6 +95,24 @@ function ActivityLog({ taskId }) {
 
 export default function TaskDetailDialog({ open, onClose, task }) {
   const { timezone } = useTimezone()
+  const { navigate } = useNav()
+
+  // Live elapsed time for in-progress tasks
+  const [elapsed, setElapsed] = useState('')
+  useEffect(() => {
+    if (!open || !task || task.status !== 'in-progress' || !task.startedAt) { setElapsed(''); return }
+    const tick = () => setElapsed(formatDuration(task.startedAt, new Date().toISOString()) || '')
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [open, task?.id, task?.status, task?.startedAt])
+
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [open, onClose])
 
   if (!open || !task) return null
 
@@ -115,34 +136,22 @@ export default function TaskDetailDialog({ open, onClose, task }) {
               {isInProgress && <Loader2 size={16} className="text-amber-400 animate-spin shrink-0" />}
               {isDone && !hasError && <CheckCircle2 size={16} className="text-green-500 shrink-0" />}
               {isDone && hasError && <AlertCircle size={16} className="text-red-400 shrink-0" />}
-              <h2 className="text-lg font-semibold truncate">{task.title}</h2>
+              <h2 className="text-lg font-semibold">{task.title}</h2>
             </div>
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              <span className={cn(
-                'text-[11px] px-2 py-0.5 rounded-full font-medium',
-                isInProgress && 'bg-amber-500/20 text-amber-400',
-                isDone && !hasError && 'bg-green-500/20 text-green-400',
-                isDone && hasError && 'bg-red-500/20 text-red-400'
-              )}>
-                {isInProgress ? 'In Progress' : hasError ? 'Completed with Error' : 'Completed'}
-              </span>
-              {skillsList.map(sk => (
-                <span key={sk} className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">{sk}</span>
-              ))}
-              {task.completedAt && (
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <Clock size={10} />
-                  {formatTime(task.completedAt, timezone)}
-                  {duration && <span className="text-muted-foreground/60">({duration})</span>}
-                </span>
-              )}
-              {isInProgress && task.startedAt && (
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <Clock size={10} />
-                  Started {formatTime(task.startedAt, timezone)}
-                </span>
-              )}
-            </div>
+            {skillsList.length > 0 && (
+              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                {skillsList.map(sk => (
+                  <span key={sk} className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">{sk}</span>
+                ))}
+              </div>
+            )}
+            {(task.startedAt || task.completedAt) && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1.5">
+                <span>Started {formatTime(task.startedAt || task.createdAt, timezone)}</span>
+                {duration && <span className="text-green-400 font-medium flex items-center gap-0.5"><Clock size={10} />{duration}</span>}
+                {isInProgress && elapsed && <span className="text-amber-400 font-medium flex items-center gap-0.5"><Clock size={10} />{elapsed}</span>}
+              </div>
+            )}
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 ml-3"><X size={18} /></button>
         </div>
@@ -180,10 +189,14 @@ export default function TaskDetailDialog({ open, onClose, task }) {
                 <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Linked Files</h3>
                 <div className="space-y-1">
                   {filePaths.map(fp => (
-                    <div key={fp} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary/50 border border-border text-sm">
+                    <button
+                      key={fp}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary/50 border border-border text-sm hover:bg-secondary hover:border-primary/30 transition-colors w-full text-left cursor-pointer"
+                      onClick={() => { onClose(); navigate('files', { openFile: fp }) }}
+                    >
                       <FileText size={13} className="text-muted-foreground shrink-0" />
                       <span className="font-mono text-xs truncate">{fp}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>

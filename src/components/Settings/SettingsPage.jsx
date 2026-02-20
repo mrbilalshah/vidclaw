@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Settings, Clock, Globe, Save, Check, Loader2, Search, ChevronDown, Package, Zap } from 'lucide-react'
+import { Clock, Globe, Save, Check, Loader2, Search, ChevronDown, Package, Zap, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTimezone } from '../TimezoneContext'
+import PageSkeleton from '../PageSkeleton'
 
 const HEARTBEAT_OPTIONS = [
   { value: '5m', label: '5 minutes' },
@@ -106,6 +107,8 @@ export default function SettingsPage() {
   const [savedHeartbeat, setSavedHeartbeat] = useState('30m')
   const [timezone, setTimezoneLocal] = useState('UTC')
   const [savedTimezone, setSavedTimezone] = useState('UTC')
+  const [maxConcurrent, setMaxConcurrent] = useState(1)
+  const [savedMaxConcurrent, setSavedMaxConcurrent] = useState(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -124,7 +127,7 @@ export default function SettingsPage() {
   const [vidclawUpdateResult, setVidclawUpdateResult] = useState(null)
   const [refreshCountdown, setRefreshCountdown] = useState(null)
 
-  const isDirty = heartbeat !== savedHeartbeat || timezone !== savedTimezone
+  const isDirty = heartbeat !== savedHeartbeat || timezone !== savedTimezone || maxConcurrent !== savedMaxConcurrent
 
   useEffect(() => {
     fetch('/api/settings')
@@ -135,6 +138,9 @@ export default function SettingsPage() {
         const tz = d.timezone || 'UTC'
         setTimezoneLocal(tz)
         setSavedTimezone(tz)
+        const mc = d.maxConcurrent || 1
+        setMaxConcurrent(mc)
+        setSavedMaxConcurrent(mc)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -203,7 +209,7 @@ export default function SettingsPage() {
       const r = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ heartbeatEvery: heartbeat, timezone }),
+        body: JSON.stringify({ heartbeatEvery: heartbeat, timezone, maxConcurrent }),
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
@@ -212,6 +218,7 @@ export default function SettingsPage() {
       const data = await r.json()
       setSavedHeartbeat(heartbeat)
       setSavedTimezone(timezone)
+      setSavedMaxConcurrent(maxConcurrent)
       setGlobalTimezone(timezone)
       setSaved(true)
       setRestarted(!!data.restarted)
@@ -223,22 +230,11 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <Loader2 className="animate-spin mr-2" size={18} /> Loading settings…
-      </div>
-    )
-  }
+  if (loading) return <PageSkeleton variant="settings" />
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-2 mb-2">
-        <Settings size={20} className="text-primary" />
-        <h2 className="text-lg font-semibold">Settings</h2>
-      </div>
-
-      {/* Heartbeat Section */}
+{/* Heartbeat Section */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Clock size={16} className="text-orange-400" />
@@ -275,6 +271,33 @@ export default function SettingsPage() {
           Used for the clock display, calendar dates, and task timestamps. No restart needed.
         </p>
         <TimezoneCombobox value={timezone} onChange={setTimezoneLocal} />
+      </div>
+
+      {/* Concurrent Tasks */}
+      <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Layers size={16} className="text-purple-400" />
+          <h3 className="font-medium text-sm">Concurrent Tasks</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Maximum tasks the agent can work on simultaneously via sub-agents.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+            <button
+              key={n}
+              onClick={() => setMaxConcurrent(n)}
+              className={cn(
+                'w-9 h-9 rounded-md text-sm font-medium border transition-colors',
+                maxConcurrent === n
+                  ? 'border-purple-500 bg-purple-500/10 text-purple-400'
+                  : 'border-border text-muted-foreground hover:border-purple-500/50 hover:text-foreground'
+              )}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* OpenClaw Version */}
@@ -348,7 +371,7 @@ export default function SettingsPage() {
           <p className="text-xs text-muted-foreground">Could not check version</p>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="text-muted-foreground">Installed:</span>
               <span className="font-mono">{vidclawInfo.current || 'unknown'}</span>
               {vidclawInfo.latest && (

@@ -298,3 +298,77 @@ print_runtime_summary() {
   log_info "Node: ${NODE_BIN} ($("${NODE_BIN}" -v))"
   log_info "npm: ${NPM_BIN} ($("${NPM_BIN}" -v))"
 }
+
+# --- HEARTBEAT.md management ---
+
+HEARTBEAT_MARKER="## Task Queue Check"
+
+heartbeat_block_content() {
+  cat <<'HEARTBEAT_BLOCK'
+
+## Task Queue Check
+0. Record heartbeat: POST http://localhost:3333/api/heartbeat via exec (curl -X POST)
+
+1. Check in-progress tasks: GET http://localhost:3333/api/tasks and filter for status "in-progress" with pickedUp=true.
+   For each in-progress task that has a subagentId:
+   - Use sessions_list or /subagents info to check the sub-agent's status
+   - If sub-agent COMPLETED: POST http://localhost:3333/api/tasks/{id}/status-check with { "status": "completed", "message": "<result summary from sub-agent>" }
+   - If sub-agent FAILED: POST with { "status": "failed", "message": "<error details>" }
+   - If sub-agent STILL RUNNING: POST with { "status": "running", "message": "Sub-agent active" }
+   - If sub-agent NOT FOUND (crashed/disappeared) and task started > 15 min ago: POST with { "status": "timeout", "message": "Sub-agent session not found after 15min" }
+   - If sub-agent NOT FOUND but task started < 15 min ago: POST with { "status": "running", "message": "Sub-agent recently started, waiting" }
+
+2. Pick up new tasks: Fetch http://localhost:3333/api/tasks/queue?limit=capacity via exec (curl).
+   Parse the JSON response — format: { tasks: [...], maxConcurrent, activeCount, remainingSlots }
+   For each task in .tasks (already limited to available capacity):
+   a. POST http://localhost:3333/api/tasks/{id}/pickup with { "subagentId": "<session-uuid>" }
+   b. Spawn a sub-agent (sessions_spawn) with the task title + description as the prompt
+   c. If a skill is assigned, tell the sub-agent to read that skill's SKILL.md first
+   d. The sub-agent should call POST http://localhost:3333/api/tasks/{id}/complete with { "result": "<summary>" } when done, or { "error": "<what went wrong>" } if failed
+HEARTBEAT_BLOCK
+}
+
+ensure_heartbeat_block() {
+  local skip_heartbeat="${SKIP_HEARTBEAT:-0}"
+  [[ "${skip_heartbeat}" == "1" ]] && {
+    log_info "Skipping HEARTBEAT.md update by request."
+    return 0
+  }
+
+  local parent_dir parent_name repo_name heartbeat_file
+  parent_dir="$(dirname "${REPO_ROOT}")"
+  parent_name="$(basename "${parent_dir}")"
+  repo_name="$(basename "${REPO_ROOT}")"
+  heartbeat_file="${parent_dir}/HEARTBEAT.md"
+
+  if [[ "${repo_name}" != "dashboard" || "${parent_name}" != "workspace" ]]; then
+    if [[ "${FORCE_HEARTBEAT:-0}" != "1" ]]; then
+      log_warn "Skipping HEARTBEAT.md update outside */workspace/dashboard. Set FORCE_HEARTBEAT=1 to override."
+      return 0
+    fi
+  fi
+
+  if is_dry_run; then
+    if [[ -f "${heartbeat_file}" ]] && grep -q "${HEARTBEAT_MARKER}" "${heartbeat_file}" 2>/dev/null; then
+      log_info "[dry-run] would replace Task Queue Check block in ${heartbeat_file}"
+    else
+      log_info "[dry-run] would append Task Queue Check block to ${heartbeat_file}"
+    fi
+    return 0
+  fi
+
+  if [[ -f "${heartbeat_file}" ]] && grep -q "${HEARTBEAT_MARKER}" "${heartbeat_file}" 2>/dev/null; then
+    # Replace existing block: keep everything before the marker, append new block
+    local tmp_file
+    tmp_file="$(mktemp)"
+    sed "/${HEARTBEAT_MARKER}/,\$d" "${heartbeat_file}" > "${tmp_file}"
+    heartbeat_block_content >> "${tmp_file}"
+    mv "${tmp_file}" "${heartbeat_file}"
+    log_ok "Updated Task Queue Check block in ${heartbeat_file}"
+    return 0
+  fi
+
+  touch "${heartbeat_file}"
+  heartbeat_block_content >> "${heartbeat_file}"
+  log_ok "Added Task Queue Check block to ${heartbeat_file}"
+}

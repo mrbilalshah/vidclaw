@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import UsageWidget from './Usage/UsageWidget'
-import { LayoutDashboard, Calendar, FolderOpen, Puzzle, Heart, Settings, Menu, X, Coffee, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Calendar, FolderOpen, Puzzle, Heart, Settings, Menu, X, Coffee, Sun, Moon, KeyRound } from 'lucide-react'
 import { useTheme } from './ThemeContext'
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { id: 'files', label: 'Files', icon: FolderOpen },
   { id: 'skills', label: 'Skills', icon: Puzzle },
   { id: 'soul', label: 'Soul', icon: Heart },
+  { id: 'credentials', label: 'Credentials', icon: KeyRound },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -109,16 +110,9 @@ export default function Layout({ page, setPage, children }) {
             >
               <Menu size={20} />
             </button>
-            <span className="text-sm font-medium capitalize">{page === 'kanban' ? 'Task Board' : page === 'calendar' ? 'Activity Calendar' : page === 'skills' ? 'Skills Manager' : page === 'soul' ? 'Soul Editor' : page === 'settings' ? 'Settings' : 'Content Browser'}</span>
+            <span className="text-sm font-medium">{navItems.find(n => n.id === page)?.label || page}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleTheme}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <a
               href="https://buy.stripe.com/8x2aEX0Wl7Wv7Roag9cEw0f"
               target="_blank"
@@ -129,6 +123,13 @@ export default function Layout({ page, setPage, children }) {
               <span className="hidden sm:inline">Buy me a coffee</span>
             </a>
             <UsageWidget />
+            <button
+              onClick={toggleTheme}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
         </header>
         <main className="flex-1 overflow-auto p-2 sm:p-4">

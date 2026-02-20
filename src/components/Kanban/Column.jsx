@@ -6,44 +6,60 @@ import { Plus, X, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import HeartbeatTimer from '../Usage/HeartbeatTimer'
 
-function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
+const SCHEDULE_OPTIONS = [
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: '2d', label: 'Every 2 days' },
+  { id: '3d', label: 'Every 3 days' },
+  { id: '1h', label: 'Every hour' },
+  { id: '2h', label: 'Every 2 hours' },
+  { id: '6h', label: 'Every 6 hours' },
+  { id: '12h', label: 'Every 12 hours' },
+  { id: '2w', label: 'Every 2 weeks' },
+]
+
+function QuickAddInput({ inputRef, title, setTitle, onSubmit, skills }) {
   const [showSuggest, setShowSuggest] = useState(false)
   const [suggestFilter, setSuggestFilter] = useState('')
   const [suggestIndex, setSuggestIndex] = useState(0)
+  const [suggestType, setSuggestType] = useState('skill') // 'skill' or 'schedule'
   const suggestRef = useRef(null)
 
-  // Find the @ trigger position
-  function getAtInfo(text, cursorPos) {
+  // Find trigger position for a given character (@ or /)
+  function getTriggerInfo(text, cursorPos, char) {
     const before = text.slice(0, cursorPos)
-    const atIdx = before.lastIndexOf('@')
-    if (atIdx === -1) return null
-    // Make sure there's no space between @ and cursor (allow empty query right after @)
-    const query = before.slice(atIdx + 1)
+    const idx = before.lastIndexOf(char)
+    if (idx === -1) return null
+    const query = before.slice(idx + 1)
     if (/\s/.test(query)) return null
-    return { atIdx, query }
+    return { idx, query }
   }
 
-  function getFilteredSkills() {
+  function getFilteredItems() {
+    if (suggestType === 'schedule') {
+      return SCHEDULE_OPTIONS.filter(o => o.id.toLowerCase().includes(suggestFilter.toLowerCase()))
+    }
     const ids = skills.map(s => typeof s === 'string' ? s : s.id || s.name)
-    return ids.filter(id => id.toLowerCase().includes(suggestFilter.toLowerCase())).slice(0, 10)
+    return ids.filter(id => id.toLowerCase().includes(suggestFilter.toLowerCase())).slice(0, 10).map(id => ({ id, label: id }))
   }
 
-  function insertSkill(skillId) {
+  function insertItem(item) {
     const el = inputRef.current
     if (!el) return
     const cursorPos = el.selectionStart || title.length
-    const info = getAtInfo(title, cursorPos)
+    const char = suggestType === 'schedule' ? '/' : '@'
+    const info = getTriggerInfo(title, cursorPos, char)
     if (!info) return
-    const before = title.slice(0, info.atIdx)
+    const before = title.slice(0, info.idx)
     const after = title.slice(cursorPos)
-    const newTitle = before + '@' + skillId + ' ' + after
+    const newTitle = before + char + item.id + ' ' + after
     setTitle(newTitle)
     setShowSuggest(false)
     setSuggestFilter('')
-    // Focus and set cursor after inserted skill
     setTimeout(() => {
       if (el) {
-        const pos = before.length + 1 + skillId.length + 1
+        const pos = before.length + 1 + item.id.length + 1
         el.selectionStart = el.selectionEnd = pos
         el.focus()
       }
@@ -53,17 +69,24 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
   function handleChange(e) {
     const val = e.target.value
     setTitle(val)
-    // Auto-resize
     const el = e.target
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 140) + 'px'
     el.style.overflowY = el.scrollHeight > 140 ? 'auto' : 'hidden'
 
-    // Check for @ trigger
     const cursorPos = el.selectionStart || val.length
-    const info = getAtInfo(val, cursorPos)
-    if (info) {
-      setSuggestFilter(info.query)
+    // Check / trigger first, then @
+    const slashInfo = getTriggerInfo(val, cursorPos, '/')
+    const atInfo = getTriggerInfo(val, cursorPos, '@')
+
+    if (slashInfo && (!atInfo || slashInfo.idx > atInfo.idx)) {
+      setSuggestType('schedule')
+      setSuggestFilter(slashInfo.query)
+      setSuggestIndex(0)
+      setShowSuggest(true)
+    } else if (atInfo) {
+      setSuggestType('skill')
+      setSuggestFilter(atInfo.query)
       setSuggestIndex(0)
       setShowSuggest(true)
     } else {
@@ -73,7 +96,7 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
 
   function handleKeyDown(e) {
     if (showSuggest) {
-      const filtered = getFilteredSkills()
+      const filtered = getFilteredItems()
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         setSuggestIndex(i => Math.min(i + 1, filtered.length - 1))
@@ -86,7 +109,7 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
       }
       if (e.key === 'Tab' || (e.key === 'Enter' && filtered.length > 0)) {
         e.preventDefault()
-        if (filtered[suggestIndex]) insertSkill(filtered[suggestIndex])
+        if (filtered[suggestIndex]) insertItem(filtered[suggestIndex])
         return
       }
       if (e.key === 'Escape') {
@@ -98,7 +121,6 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
     if (e.key === 'Escape' && !showSuggest) { setTitle(''); }
   }
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e) {
       if (suggestRef.current && !suggestRef.current.contains(e.target)) {
@@ -109,7 +131,7 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const filtered = getFilteredSkills()
+  const filtered = getFilteredItems()
 
   return (
     <div className="relative" ref={suggestRef}>
@@ -118,24 +140,27 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
         value={title}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder="Enter a title... (type @ for skills)"
+        placeholder="Task... (@ skills, / schedule)"
         rows={1}
         style={{ overflow: 'hidden' }}
         className="w-full bg-secondary/80 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/25"
       />
       {showSuggest && filtered.length > 0 && (
         <div className="absolute z-50 bottom-full mb-1 w-full max-h-40 overflow-y-auto bg-card border border-border rounded-md shadow-lg">
-          {filtered.map((id, i) => (
+          {filtered.map((item, i) => (
             <button
-              key={id}
+              key={item.id}
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); insertSkill(id) }}
+              onMouseDown={(e) => { e.preventDefault(); insertItem(item) }}
               className={cn(
                 'w-full text-left px-3 py-1.5 text-sm transition-colors',
                 i === suggestIndex ? 'bg-primary/20 text-foreground' : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
               )}
             >
-              @{id}
+              <span className="text-muted-foreground">{suggestType === 'schedule' ? '/' : '@'}</span>{item.id}
+              {suggestType === 'schedule' && item.label !== item.id && (
+                <span className="text-muted-foreground/60 ml-2">{item.label}</span>
+              )}
             </button>
           ))}
         </div>
@@ -144,7 +169,7 @@ function SkillAutosuggest({ inputRef, title, setTitle, onSubmit, skills }) {
   )
 }
 
-export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onView, onDelete, onRun, onToggleSchedule, onBulkArchive }) {
+export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onView, onDelete, onRun, onToggleSchedule, onBulkArchive, capacity }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
@@ -165,8 +190,25 @@ export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onVie
     // Extract @skill mentions from the title
     const skillMatches = t.match(/@(\S+)/g) || []
     const mentionedSkills = skillMatches.map(m => m.slice(1))
-    const cleanTitle = t.replace(/@\S+/g, '').replace(/\s+/g, ' ').trim()
-    onQuickAdd?.(column.id, cleanTitle || t, mentionedSkills)
+    // Extract /schedule shorthand from the title
+    const scheduleMatch = t.match(/\/(\S+)/)
+    let schedule = null
+    if (scheduleMatch) {
+      const s = scheduleMatch[1].toLowerCase()
+      if (['daily', 'weekly', 'monthly'].includes(s)) schedule = s
+      else {
+        const m = s.match(/^(\d+)(h|d|w|m)$/)
+        if (m) {
+          const n = parseInt(m[1]), u = m[2]
+          if (u === 'h') schedule = n === 1 ? '0 * * * *' : `0 */${n} * * *`
+          else if (u === 'd') schedule = n === 1 ? '0 9 * * *' : `0 9 */${n} * *`
+          else if (u === 'w') schedule = `0 9 */${n * 7} * *`
+          else if (u === 'm') schedule = n === 1 ? '0 9 1 * *' : `0 9 1 */${n} *`
+        }
+      }
+    }
+    const cleanTitle = t.replace(/@\S+/g, '').replace(/\/\S+/g, '').replace(/\s+/g, ' ').trim()
+    onQuickAdd?.(column.id, cleanTitle || t, mentionedSkills, schedule)
     setTitle('')
   }
 
@@ -185,6 +227,22 @@ export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onVie
           <div className={cn('w-2 h-2 rounded-full', column.color)} />
           <span className="text-sm font-medium">{column.title}</span>
           <span className="text-xs text-muted-foreground bg-secondary rounded-full px-1.5">{tasks.length}</span>
+          {capacity && capacity.maxConcurrent > 1 && (
+            <div className="flex items-center gap-1 ml-1.5">
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: capacity.maxConcurrent }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full',
+                      i < capacity.activeCount ? 'bg-amber-400' : 'bg-muted-foreground/30'
+                    )}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] text-muted-foreground">{capacity.activeCount}/{capacity.maxConcurrent}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {column.id === 'done' && tasks.length > 0 && (
@@ -222,7 +280,7 @@ export default function Column({ column, tasks, onAdd, onQuickAdd, onEdit, onVie
           </button>
         ) : (
           <div className="space-y-2">
-            <SkillAutosuggest
+            <QuickAddInput
               inputRef={inputRef}
               title={title}
               setTitle={setTitle}

@@ -5,6 +5,7 @@ import Column from './Column'
 import TaskCard from './TaskCard'
 import TaskDialog from './TaskDialog'
 import TaskDetailDialog from './TaskDetailDialog'
+import PageSkeleton from '../PageSkeleton'
 import { useSocket } from '../../hooks/useSocket.jsx'
 
 const COLUMNS = [
@@ -16,10 +17,12 @@ const COLUMNS = [
 
 export default function Board() {
   const [tasks, setTasks] = useState([])
+  const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [viewTask, setViewTask] = useState(null)
+  const [capacity, setCapacity] = useState({ maxConcurrent: 1, activeCount: 0, remainingSlots: 1 })
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -31,12 +34,24 @@ export default function Board() {
   }, [])
 
   const fetchTasks = useCallback(async () => {
-    const res = await fetch('/api/tasks')
-    setTasks(await res.json())
+    try {
+      const res = await fetch('/api/tasks')
+      setTasks(await res.json())
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { fetchTasks() }, [fetchTasks])
-  useSocket('tasks', setTasks)
+  const fetchCapacity = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tasks/capacity')
+      setCapacity(await res.json())
+    } catch {}
+  }, [])
+
+  useEffect(() => { fetchTasks(); fetchCapacity() }, [fetchTasks, fetchCapacity])
+  useSocket('tasks', (newTasks) => { setTasks(newTasks); fetchCapacity() })
+  useSocket('settings', () => { fetchCapacity() })
 
   const activeTask = tasks.find(t => t.id === activeId)
 
@@ -183,7 +198,7 @@ export default function Board() {
   }
 
   async function handleBulkArchive(status) {
-    await fetch('/api/tasks/bulk-archive', {
+    await fetch('/api/tasks/bulk-delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -191,11 +206,11 @@ export default function Board() {
     fetchTasks()
   }
 
-  async function handleQuickAdd(status, title, skills = []) {
+  async function handleQuickAdd(status, title, skills = [], schedule = null) {
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, status, skills, skill: skills[0] || '' }),
+      body: JSON.stringify({ title, status, skills, skill: skills[0] || '', schedule }),
     })
     fetchTasks()
   }
@@ -215,6 +230,8 @@ export default function Board() {
   }
 
 
+  if (loading) return <PageSkeleton variant="kanban" />
+
   return (
     <>
       <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={e => setActiveId(e.active.id)} onDragEnd={handleDragEnd}>
@@ -232,6 +249,7 @@ export default function Board() {
               onRun={handleRun}
               onToggleSchedule={handleToggleSchedule}
               onBulkArchive={handleBulkArchive}
+              capacity={col.id === 'in-progress' ? capacity : undefined}
             />
           ))}
         </div>
@@ -243,6 +261,7 @@ export default function Board() {
         open={dialogOpen}
         onClose={() => { setDialogOpen(false); setEditTask(null) }}
         onSave={handleSave}
+        onDelete={handleDelete}
         task={editTask}
       />
       <TaskDetailDialog

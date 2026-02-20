@@ -116,6 +116,8 @@ else
   log_warn "Skipping dependency install and build (--skip-build)."
 fi
 
+ensure_heartbeat_block
+
 if [[ "${NO_RESTART}" == "1" ]]; then
   log_warn "Skipping service restart (--no-restart)."
 else

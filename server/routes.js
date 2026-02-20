@@ -6,7 +6,7 @@ import { getActivity, getTime } from './controllers/activity.js';
 import {
   listTasks, createTask, updateTask, reorderTasks,
   runTask, getTaskQueue, pickupTask, completeTask, deleteTask, bulkDeleteTasks,
-  getCalendar, getRunHistory, toggleSchedule,
+  getCalendar, getRunHistory, toggleSchedule, getCapacity, reportStatusCheck,
 } from './controllers/tasks.js';
 import { getUsage } from './controllers/usage.js';
 import { getOpenclawVersion, updateOpenclaw } from './controllers/openclaw.js';
@@ -16,6 +16,7 @@ import { listFiles, getFileContent, downloadFile, getWorkspaceFile, putWorkspace
 import { getSoul, putSoul, getSoulHistory, revertSoul, getSoulTemplates } from './controllers/soul.js';
 import { getSettings, postSettings } from './controllers/settings.js';
 import { getVidclawVersion, updateVidclaw } from './controllers/vidclaw.js';
+import { listCredentials, putCredential, deleteCredential } from './controllers/credentials.js';
 
 const router = Router();
 
@@ -30,8 +31,10 @@ router.put('/api/tasks/:id', updateTask);
 router.post('/api/tasks/reorder', reorderTasks);
 router.post('/api/tasks/:id/run', runTask);
 router.get('/api/tasks/queue', getTaskQueue);
+router.get('/api/tasks/capacity', getCapacity);
 router.post('/api/tasks/:id/pickup', pickupTask);
 router.post('/api/tasks/:id/complete', completeTask);
+router.post('/api/tasks/:id/status-check', reportStatusCheck);
 router.get('/api/tasks/:id/history', getRunHistory);
 router.post('/api/tasks/:id/schedule-toggle', toggleSchedule);
 router.delete('/api/tasks/:id', deleteTask);
@@ -78,6 +81,11 @@ router.get('/api/soul/templates', getSoulTemplates);
 // Settings
 router.get('/api/settings', getSettings);
 router.post('/api/settings', postSettings);
+
+// Credentials
+router.get('/api/credentials', listCredentials);
+router.put('/api/credentials/:name', putCredential);
+router.delete('/api/credentials/:name', deleteCredential);
 
 // VidClaw
 router.get('/api/vidclaw/version', getVidclawVersion);

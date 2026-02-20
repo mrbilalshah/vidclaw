@@ -1,9 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { readTasks, writeTasks, logActivity } from '../lib/fileStore.js';
+import { readTasks, writeTasks, logActivity, readSettings } from '../lib/fileStore.js';
 import { broadcast } from '../broadcast.js';
 import { isoToDateInTz } from '../lib/timezone.js';
 import { WORKSPACE } from '../config.js';
+import { computeNextRun, computeFutureRuns } from '../lib/schedule.js';
 
 export function listTasks(req, res) {
   const tasks = readTasks();
@@ -45,7 +46,7 @@ export function updateTask(req, res) {
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
   const wasNotDone = tasks[idx].status !== 'done';
-  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order'];
+  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order', 'subagentId'];
   const updates = {};
   for (const k of allowedFields) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
   tasks[idx] = { ...tasks[idx], ...updates, updatedAt: new Date().toISOString() };
@@ -53,7 +54,7 @@ export function updateTask(req, res) {
   if (updates.schedule !== undefined) {
     if (updates.schedule) {
       tasks[idx].scheduledAt = computeNextRun(updates.schedule);
-      if (tasks[idx].scheduleEnabled === undefined) tasks[idx].scheduleEnabled = true;
+      tasks[idx].scheduleEnabled = true;
     } else {
       tasks[idx].scheduledAt = null;
       tasks[idx].scheduleEnabled = false;
@@ -117,7 +118,14 @@ export function getTaskQueue(req, res) {
     if (oa !== ob) return oa - ob;
     return (a.createdAt || '').localeCompare(b.createdAt || '');
   });
-  res.json(queue);
+
+  const settings = readSettings();
+  const maxConcurrent = settings.maxConcurrent || 1;
+  const activeCount = tasks.filter(t => t.status === 'in-progress' && t.pickedUp).length;
+  const remainingSlots = Math.max(0, maxConcurrent - activeCount);
+
+  const limitedQueue = req.query.limit === 'capacity' ? queue.slice(0, remainingSlots) : queue;
+  res.json({ tasks: limitedQueue, maxConcurrent, activeCount, remainingSlots });
 }
 
 export function pickupTask(req, res) {
@@ -128,8 +136,9 @@ export function pickupTask(req, res) {
   tasks[idx].status = 'in-progress';
   tasks[idx].startedAt = tasks[idx].startedAt || new Date().toISOString();
   tasks[idx].updatedAt = new Date().toISOString();
+  if (req.body.subagentId) tasks[idx].subagentId = req.body.subagentId;
   writeTasks(tasks);
-  logActivity('bot', 'task_pickup', { taskId: req.params.id, title: tasks[idx].title });
+  logActivity('bot', 'task_pickup', { taskId: req.params.id, title: tasks[idx].title, subagentId: req.body.subagentId || null });
   broadcast('tasks', tasks);
   res.json(tasks[idx]);
 }
@@ -138,13 +147,38 @@ export function completeTask(req, res) {
   const tasks = readTasks();
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
-  tasks[idx].status = 'done';
-  tasks[idx].completedAt = new Date().toISOString();
-  tasks[idx].updatedAt = new Date().toISOString();
-  tasks[idx].result = req.body.result || null;
-  if (req.body.error) tasks[idx].error = req.body.error;
+  const now = new Date().toISOString();
+  const hasError = !!req.body.error;
+
+  // If recurring, save run to history and reschedule instead of marking done
+  if (tasks[idx].schedule && tasks[idx].scheduleEnabled !== false) {
+    if (!Array.isArray(tasks[idx].runHistory)) tasks[idx].runHistory = [];
+    tasks[idx].runHistory.push({
+      completedAt: now,
+      startedAt: tasks[idx].startedAt,
+      result: req.body.result || null,
+      error: req.body.error || null,
+    });
+    tasks[idx].status = 'todo';
+    tasks[idx].scheduledAt = computeNextRun(tasks[idx].schedule);
+    tasks[idx].result = req.body.result || null;
+    tasks[idx].error = req.body.error || null;
+    tasks[idx].startedAt = null;
+    tasks[idx].completedAt = null;
+    tasks[idx].subagentId = null;
+    tasks[idx].pickedUp = false;
+    tasks[idx].updatedAt = now;
+  } else {
+    tasks[idx].status = 'done';
+    tasks[idx].completedAt = now;
+    tasks[idx].updatedAt = now;
+    tasks[idx].result = req.body.result || null;
+    tasks[idx].subagentId = null;
+    tasks[idx].pickedUp = false;
+    if (hasError) tasks[idx].error = req.body.error;
+  }
   writeTasks(tasks);
-  logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError: !!req.body.error });
+  logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError });
   broadcast('tasks', tasks);
   res.json(tasks[idx]);
 }
@@ -197,7 +231,13 @@ export function getCalendar(req, res) {
     for (const f of files) {
       const date = f.replace('.md', '');
       initDay(date);
-      data[date].memory = true;
+      try {
+        const content = fs.readFileSync(path.join(memoryDir, f), 'utf8').trim();
+        const firstLine = content.split('\n').find(l => l.trim() && !l.startsWith('#')) || content.split('\n')[0] || '';
+        data[date].memory = firstLine.replace(/^[#\-*>\s]+/, '').trim().slice(0, 120) || true;
+      } catch {
+        data[date].memory = true;
+      }
     }
   } catch {}
   const tasks = readTasks();
@@ -218,8 +258,26 @@ export function getCalendar(req, res) {
         }
       }
     }
-    // Scheduled / upcoming tasks
-    if (t.scheduledAt && t.status !== 'done') {
+    // Scheduled / upcoming tasks — project future runs for recurring schedules
+    if (t.schedule && t.scheduleEnabled !== false && t.status !== 'done') {
+      try {
+        const runs = computeFutureRuns(t.schedule, 90);
+        for (const run of runs) {
+          const date = isoToDateInTz(run);
+          initDay(date);
+          if (!data[date].scheduled.includes(t.title)) data[date].scheduled.push(t.title);
+        }
+      } catch {}
+      // Also include the immediate next run if not covered
+      if (t.scheduledAt) {
+        try {
+          const date = isoToDateInTz(new Date(t.scheduledAt).toISOString());
+          initDay(date);
+          if (!data[date].scheduled.includes(t.title)) data[date].scheduled.push(t.title);
+        } catch {}
+      }
+    } else if (t.scheduledAt && t.status !== 'done') {
+      // One-off scheduledAt without recurring schedule
       try {
         const date = isoToDateInTz(new Date(t.scheduledAt).toISOString());
         initDay(date);
@@ -235,6 +293,68 @@ export function getRunHistory(req, res) {
   const task = tasks.find(t => t.id === req.params.id);
   if (!task) return res.status(404).json({ error: 'Task not found' });
   res.json(task.runHistory || []);
+}
+
+export function getCapacity(req, res) {
+  const tasks = readTasks();
+  const settings = readSettings();
+  const maxConcurrent = settings.maxConcurrent || 1;
+  const activeCount = tasks.filter(t => t.status === 'in-progress' && t.pickedUp).length;
+  const remainingSlots = Math.max(0, maxConcurrent - activeCount);
+  res.json({ maxConcurrent, activeCount, remainingSlots });
+}
+
+export function reportStatusCheck(req, res) {
+  const tasks = readTasks();
+  const idx = tasks.findIndex(t => t.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+
+  const { status, message } = req.body;
+  const validStatuses = ['running', 'completed', 'failed', 'timeout'];
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'status must be one of: ' + validStatuses.join(', ') });
+  }
+
+  logActivity('bot', 'task_status_check', { taskId: req.params.id, title: tasks[idx].title, status, message: message || null });
+
+  if (status === 'completed' || status === 'failed' || status === 'timeout') {
+    const now = new Date().toISOString();
+    const errorMsg = status === 'completed' ? null : (message || (status === 'timeout' ? 'Task timed out' : 'Task failed'));
+
+    if (tasks[idx].schedule && tasks[idx].scheduleEnabled !== false) {
+      if (!Array.isArray(tasks[idx].runHistory)) tasks[idx].runHistory = [];
+      tasks[idx].runHistory.push({
+        completedAt: now,
+        startedAt: tasks[idx].startedAt,
+        result: status === 'completed' ? (message || null) : null,
+        error: errorMsg,
+      });
+      tasks[idx].status = 'todo';
+      tasks[idx].scheduledAt = computeNextRun(tasks[idx].schedule);
+      tasks[idx].result = status === 'completed' ? (message || null) : null;
+      tasks[idx].error = errorMsg;
+      tasks[idx].startedAt = null;
+      tasks[idx].completedAt = null;
+      tasks[idx].subagentId = null;
+      tasks[idx].pickedUp = false;
+      tasks[idx].updatedAt = now;
+    } else {
+      tasks[idx].status = 'done';
+      tasks[idx].completedAt = now;
+      tasks[idx].updatedAt = now;
+      tasks[idx].result = status === 'completed' ? (message || null) : null;
+      tasks[idx].error = errorMsg;
+      tasks[idx].subagentId = null;
+      tasks[idx].pickedUp = false;
+    }
+    writeTasks(tasks);
+    if (status !== 'completed') logActivity('bot', 'task_timeout', { taskId: req.params.id, title: tasks[idx].title, message: message || null });
+    broadcast('tasks', tasks);
+    return res.json(tasks[idx]);
+  }
+
+  // status === 'running' — just log, no state change
+  res.json({ ok: true, status: 'running' });
 }
 
 export function toggleSchedule(req, res) {
