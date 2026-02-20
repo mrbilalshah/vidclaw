@@ -17,6 +17,9 @@ import { __dirname, OPENCLAW_JSON } from '../config.js';
  *   1. server/data/channels.json (user-editable, takes priority)
  *   2. Falls back to a sensible default list
  *
+ * NOTE: Channel assignment is currently UI-only (tagging/filtering).
+ * Actual execution routing to specific channels is planned for future work.
+ *
  * Future: read from openclaw.json to auto-discover configured channels.
  */
 
@@ -28,6 +31,20 @@ const DEFAULT_CHANNELS = [
   { id: 'whatsapp', label: 'WhatsApp', icon: 'Smartphone' },
   { id: 'slack', label: 'Slack', icon: 'Slack' },
 ];
+
+/**
+ * Returns an array of known channel ID strings.
+ * Used for server-side validation of the task `channel` field.
+ */
+export function getKnownChannelIds() {
+  try {
+    if (fs.existsSync(CHANNELS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CHANNELS_FILE, 'utf8'));
+      return data.map(c => c.id);
+    }
+  } catch {}
+  return DEFAULT_CHANNELS.map(c => c.id);
+}
 
 export function listChannels(req, res) {
   try {

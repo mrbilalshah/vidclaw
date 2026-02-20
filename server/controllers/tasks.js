@@ -5,14 +5,31 @@ import { broadcast } from '../broadcast.js';
 import { isoToDateInTz } from '../lib/timezone.js';
 import { WORKSPACE } from '../config.js';
 import { computeNextRun, computeFutureRuns } from '../lib/schedule.js';
+import { getKnownChannelIds } from './channels.js';
 
 export function listTasks(req, res) {
-  const tasks = readTasks();
+  let tasks = readTasks();
   const includeArchived = req.query.includeArchived === 'true';
-  res.json(includeArchived ? tasks : tasks.filter(t => t.status !== 'archived'));
+  if (!includeArchived) tasks = tasks.filter(t => t.status !== 'archived');
+  // Filter by channel if ?channel= query param is provided
+  if (req.query.channel !== undefined) {
+    const ch = req.query.channel || null;
+    tasks = tasks.filter(t => (t.channel || null) === ch);
+  }
+  res.json(tasks);
+}
+
+/** Validate channel value against known channel IDs. Returns error string or null. */
+function validateChannel(channel) {
+  if (channel === null || channel === undefined || channel === '') return null;
+  const known = getKnownChannelIds();
+  if (!known.includes(channel)) return `Unknown channel "${channel}". Valid: ${known.join(', ')}`;
+  return null;
 }
 
 export function createTask(req, res) {
+  const channelErr = validateChannel(req.body.channel);
+  if (channelErr) return res.status(400).json({ error: channelErr });
   const tasks = readTasks();
   const task = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -43,6 +60,10 @@ export function createTask(req, res) {
 }
 
 export function updateTask(req, res) {
+  if (req.body.channel !== undefined) {
+    const channelErr = validateChannel(req.body.channel);
+    if (channelErr) return res.status(400).json({ error: channelErr });
+  }
   const tasks = readTasks();
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
