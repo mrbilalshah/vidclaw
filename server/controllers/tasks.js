@@ -32,6 +32,7 @@ export function createTask(req, res) {
     result: null,
     startedAt: null,
     error: null,
+    channel: req.body.channel || null,
     order: req.body.order ?? tasks.filter(t => t.status === (req.body.status || 'backlog')).length,
   };
   tasks.push(task);
@@ -46,7 +47,7 @@ export function updateTask(req, res) {
   const idx = tasks.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
   const wasNotDone = tasks[idx].status !== 'done';
-  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order', 'subagentId'];
+  const allowedFields = ['title', 'description', 'priority', 'skill', 'skills', 'status', 'schedule', 'scheduledAt', 'scheduleEnabled', 'result', 'startedAt', 'completedAt', 'error', 'order', 'subagentId', 'channel'];
   const updates = {};
   for (const k of allowedFields) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
   tasks[idx] = { ...tasks[idx], ...updates, updatedAt: new Date().toISOString() };

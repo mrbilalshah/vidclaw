@@ -17,6 +17,7 @@ import { getSoul, putSoul, getSoulHistory, revertSoul, getSoulTemplates } from '
 import { getSettings, postSettings } from './controllers/settings.js';
 import { getVidclawVersion, updateVidclaw } from './controllers/vidclaw.js';
 import { listCredentials, putCredential, deleteCredential } from './controllers/credentials.js';
+import { listChannels } from './controllers/channels.js';
 
 const router = Router();
 
@@ -40,6 +41,9 @@ router.post('/api/tasks/:id/schedule-toggle', toggleSchedule);
 router.delete('/api/tasks/:id', deleteTask);
 router.post('/api/tasks/bulk-delete', bulkDeleteTasks);
 router.get('/api/calendar', getCalendar);
+
+// Channels
+router.get('/api/channels', listChannels);
 
 // Usage
 router.get('/api/usage', getUsage);

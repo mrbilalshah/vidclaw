@@ -208,20 +208,22 @@ function buildScheduleString({ scheduleInterval, schedulePeriod, scheduleTime })
 }
 
 export default function TaskDialog({ open, onClose, onSave, onDelete, task }) {
-  const [form, setForm] = useState({ title: '', description: '', skills: [], status: 'backlog', scheduleMode: 'none', scheduleInterval: 1, schedulePeriod: 'days', scheduleTime: '09:00', scheduleCron: '' })
+  const [form, setForm] = useState({ title: '', description: '', skills: [], status: 'backlog', channel: '', scheduleMode: 'none', scheduleInterval: 1, schedulePeriod: 'days', scheduleTime: '09:00', scheduleCron: '' })
   const [skills, setSkills] = useState([])
+  const [channels, setChannels] = useState([])
 
   useEffect(() => {
     fetch('/api/skills').then(r => r.json()).then(setSkills).catch(() => {})
+    fetch('/api/channels').then(r => r.json()).then(setChannels).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (task) {
       const taskSkills = task.skills && task.skills.length ? task.skills : (task.skill ? [task.skill] : [])
       const sched = parseSchedule(task.schedule)
-      setForm({ title: task.title, description: task.description, skills: taskSkills, status: task.status, scheduleMode: sched.mode, scheduleInterval: sched.interval, schedulePeriod: sched.period, scheduleTime: sched.time, scheduleCron: sched.cron })
+      setForm({ title: task.title, description: task.description, skills: taskSkills, status: task.status, channel: task.channel || '', scheduleMode: sched.mode, scheduleInterval: sched.interval, schedulePeriod: sched.period, scheduleTime: sched.time, scheduleCron: sched.cron })
     } else {
-      setForm({ title: '', description: '', skills: [], status: 'backlog', scheduleMode: 'none', scheduleInterval: 1, schedulePeriod: 'days', scheduleTime: '09:00', scheduleCron: '' })
+      setForm({ title: '', description: '', skills: [], status: 'backlog', channel: '', scheduleMode: 'none', scheduleInterval: 1, schedulePeriod: 'days', scheduleTime: '09:00', scheduleCron: '' })
     }
   }, [task, open])
 
@@ -240,7 +242,7 @@ export default function TaskDialog({ open, onClose, onSave, onDelete, task }) {
       : form.scheduleMode === 'interval' ? buildScheduleString(form)
       : null
     const { scheduleMode, scheduleInterval, schedulePeriod, scheduleTime, scheduleCron, ...rest } = form
-    const data = { ...rest, skill: rest.skills[0] || '', schedule }
+    const data = { ...rest, skill: rest.skills[0] || '', schedule, channel: rest.channel || null }
     onSave(data)
   }
 
@@ -290,6 +292,20 @@ export default function TaskDialog({ open, onClose, onSave, onDelete, task }) {
                 <option value="todo">Todo</option>
                 <option value="in-progress">In Progress</option>
                 <option value="done">Done</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Channel</label>
+              <select
+                className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm outline-none"
+                value={form.channel}
+                onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}
+              >
+                <option value="">Main Session (default)</option>
+                {channels.map(ch => (
+                  <option key={ch.id} value={ch.id}>{ch.label}</option>
+                ))}
               </select>
             </div>
 
