@@ -9,7 +9,7 @@ export default function PixelBotView({ onAddTask }) {
   const frameRef = useRef(0)
   const animRef = useRef(null)
   const lastFrameTime = useRef(0)
-  const celebratingRef = useRef({ seenDoneIds: new Set(), celebrateUntil: 0 })
+  const stateRef = useRef({ seenDoneIds: new Set(), seenInProgressIds: new Set(), celebrateUntil: 0, workingUntil: 0, pendingCelebration: false })
   const countsRef = useRef({ backlog: 0, todo: 0, 'in-progress': 0, done: 0 })
   const [tasks, setTasks] = useState([])
   const [botState, setBotState] = useState('idle')
@@ -26,13 +26,21 @@ export default function PixelBotView({ onAddTask }) {
   useSocket('tasks', (newTasks) => { setTasks(newTasks) })
 
   useEffect(() => {
-    setBotState(deriveState(tasks, celebratingRef))
+    setBotState(deriveState(tasks, stateRef))
     countsRef.current = {
       backlog: tasks.filter(t => t.status === 'backlog').length,
       todo: tasks.filter(t => t.status === 'todo').length,
       'in-progress': tasks.filter(t => t.status === 'in-progress').length,
       done: tasks.filter(t => t.status === 'done').length,
     }
+  }, [tasks])
+
+  // Re-evaluate state periodically so timed transitions (working→celebrating→idle) fire
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBotState(deriveState(tasks, stateRef))
+    }, 1000)
+    return () => clearInterval(interval)
   }, [tasks])
 
   useEffect(() => {
