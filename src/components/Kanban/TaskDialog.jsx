@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { X, Bot, User, Activity, FileText, FolderOpen } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import AttachmentSection from './AttachmentSection'
 import { extractFilePaths } from './TaskCard'
 // NavigationContext removed — not yet implemented
@@ -274,8 +275,8 @@ export default function TaskDialog({ open, onClose, onSave, onDelete, task, defa
         </div>
 
         <div className="flex-1 overflow-hidden min-h-[320px] flex flex-col md:flex-row">
-          {/* Form — left 2/3 */}
-          <div className="w-full md:w-2/3 overflow-y-auto p-5 space-y-4">
+          {/* Form */}
+          <div className={cn('w-full overflow-y-auto p-5 space-y-4', task && 'md:w-2/3')}>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Title</label>
               <input
@@ -410,14 +411,16 @@ export default function TaskDialog({ open, onClose, onSave, onDelete, task, defa
             )}
           </div>
 
-          {/* Activity Log — right 1/3 */}
-          <div className="w-full md:w-1/3 border-t md:border-t-0 md:border-l border-border overflow-y-auto">
-            <div className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium text-muted-foreground border-b border-border">
-              <Activity size={14} />
-              Activity Log
+          {/* Activity Log — right 1/3, only for existing tasks */}
+          {task && (
+            <div className="w-full md:w-1/3 border-t md:border-t-0 md:border-l border-border overflow-y-auto">
+              <div className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium text-muted-foreground border-b border-border">
+                <Activity size={14} />
+                Activity Log
+              </div>
+              <ActivityLog taskId={task.id} />
             </div>
-            <ActivityLog taskId={task?.id} />
-          </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-border shrink-0">

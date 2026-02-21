@@ -17,6 +17,7 @@ export default function PixelBotView({ onAddTask, visible = true }) {
   const botStateRef = useRef('idle')
   const visibleRef = useRef(visible)
   const resizeRef = useRef(null)
+  const animateFnRef = useRef(null)
   const [tasks, setTasks] = useState([])
   const [botState, setBotState] = useState('idle')
 
@@ -82,6 +83,7 @@ export default function PixelBotView({ onAddTask, visible = true }) {
       ctx.clearRect(0, 0, w, h)
       drawScene(ctx, w, h, frameRef.current, botStateRef.current, countsRef.current, lobsterRef.current)
     }
+    animateFnRef.current = animate
 
     const onVisibility = () => {
       if (!document.hidden && visibleRef.current) {
@@ -98,6 +100,7 @@ export default function PixelBotView({ onAddTask, visible = true }) {
       window.removeEventListener('resize', resize)
       if (animRef.current) cancelAnimationFrame(animRef.current)
       animRef.current = null
+      animateFnRef.current = null
     }
   }, []) // Run once on mount — reads botStateRef/countsRef for latest values
 
@@ -107,22 +110,8 @@ export default function PixelBotView({ onAddTask, visible = true }) {
     if (visible) {
       if (resizeRef.current) resizeRef.current()
       lastFrameTime.current = 0
-      if (canvasRef.current && !animRef.current) {
-        const ctx = canvasRef.current.getContext('2d')
-        const animate = (timestamp) => {
-          if (document.hidden || !visibleRef.current) return
-          animRef.current = requestAnimationFrame(animate)
-          const elapsed = timestamp - lastFrameTime.current
-          if (elapsed < FRAME_INTERVAL) return
-          lastFrameTime.current = timestamp - (elapsed % FRAME_INTERVAL)
-          frameRef.current = (frameRef.current + 1) % 10000
-          const w = canvasRef.current.width
-          const h = canvasRef.current.height
-          if (w === 0 || h === 0) return
-          ctx.clearRect(0, 0, w, h)
-          drawScene(ctx, w, h, frameRef.current, botStateRef.current, countsRef.current, lobsterRef.current)
-        }
-        animRef.current = requestAnimationFrame(animate)
+      if (animateFnRef.current && !animRef.current) {
+        animRef.current = requestAnimationFrame(animateFnRef.current)
       }
     } else {
       if (animRef.current) {
