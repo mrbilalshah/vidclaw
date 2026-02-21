@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useSocket } from '../../hooks/useSocket.jsx'
 import { FRAME_INTERVAL, STATE_LABELS } from './constants'
+import HeartbeatTimer from '../Usage/HeartbeatTimer'
 import { drawScene } from './scene'
 import { deriveState } from './deriveState'
 import { createLobster } from './lobsterAI'
@@ -117,6 +118,7 @@ export default function PixelBotView({ onAddTask }) {
           <span>{counts.todo} todo</span>
           <span className="text-amber-500">{counts['in-progress']} active</span>
           <span className="text-green-500">{counts.done} done</span>
+          <HeartbeatTimer />
           {onAddTask && (
             <button
               onClick={onAddTask}
