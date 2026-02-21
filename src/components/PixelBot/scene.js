@@ -1,10 +1,10 @@
 import { PIXEL } from './constants'
 import { drawPixelRect } from './drawing'
 import { drawLobster } from './lobster'
-import { drawTaskPile, drawCouch, drawDesk } from './furniture'
+import { drawTaskPile, drawCouch, drawDesk, drawBookshelf, drawAquarium, drawPlant, drawWallClock, drawPoster } from './furniture'
 import { drawSpaceWindow } from './space'
 
-export function drawScene(ctx, w, h, frame, state, counts) {
+export function drawScene(ctx, w, h, frame, state, counts, idleFrame = 0) {
   const cols = Math.floor(w / PIXEL)
   const rows = Math.floor(h / PIXEL)
   const floorY = rows - 12
@@ -20,6 +20,10 @@ export function drawScene(ctx, w, h, frame, state, counts) {
   }
   drawPixelRect(ctx, 0, floorY, cols, 1, '#3f3f46')
 
+  // === FAR LEFT: Bookshelf ===
+  const shelfX = midX - 55
+  drawBookshelf(ctx, shelfX, floorY)
+
   // === LEFT: Todo task pile ===
   const todoCount = (counts.backlog || 0) + (counts.todo || 0)
   const pileLeftX = midX - 30
@@ -28,26 +32,39 @@ export function drawScene(ctx, w, h, frame, state, counts) {
   // === CENTER: Desk (work area) ===
   const deskX = midX - 15
   const deskY = rows - 18
-  const monX = midX - 6
-  const monY = deskY - 8
-  const mugX = deskX + 22
-  drawDesk(ctx, deskX, deskY, midX, monX, monY, mugX, state, frame)
 
   // === RIGHT OF DESK: Done task pile ===
   const doneCount = counts.done || 0
   const pileRightX = midX + 22
   drawTaskPile(ctx, pileRightX, floorY, doneCount, '#22c55e')
 
+  // === AQUARIUM: between done pile and couch ===
+  const aquariumX = midX + 42
+  drawAquarium(ctx, aquariumX, floorY, frame)
+
   // === FAR RIGHT: Chill area (couch) ===
   const couchX = midX + 70
   drawCouch(ctx, couchX, floorY)
 
+  // === Plant next to couch ===
+  const plantX = midX + 85
+  drawPlant(ctx, plantX, floorY, frame)
+
+  // === Wall decorations ===
+  drawWallClock(ctx, couchX, floorY - 25, frame)
+  drawPoster(ctx, shelfX + 16, floorY - 26, 0)
+  drawPoster(ctx, midX + 14, floorY - 28, 1)
+
   // === LOBSTER: position depends on state ===
+  let lobsterAtDesk = false
   if (state === 'working') {
+    lobsterAtDesk = true
     const lobX = midX
     const lobY = deskY - 3
+    drawDesk(ctx, deskX, deskY, midX, state, frame, lobsterAtDesk)
     drawLobster(ctx, lobX, lobY, frame, state)
   } else if (state === 'celebrating') {
+    drawDesk(ctx, deskX, deskY, midX, state, frame, false)
     const lobX = pileRightX + 4
     const lobY = floorY - 5
     drawLobster(ctx, lobX, lobY, frame, state)
@@ -55,11 +72,12 @@ export function drawScene(ctx, w, h, frame, state, counts) {
     // Idle — roaming between waypoints
     const groundY = floorY - 5
     const waypoints = [
-      { x: couchX, y: groundY, seatY: floorY - 12, pause: 60 },
+      { x: shelfX + 7, y: groundY, pause: 45 },
       { x: pileLeftX + 4, y: groundY, pause: 30 },
-      { x: midX + 10, y: groundY, pause: 20 },
+      { x: midX, y: groundY, seatY: deskY - 3, pause: 50, atDesk: true },
       { x: pileRightX + 4, y: groundY, pause: 30 },
-      { x: midX - 18, y: groundY, pause: 40 },
+      { x: aquariumX + 7, y: groundY, pause: 40 },
+      { x: couchX, y: groundY, seatY: floorY - 12, pause: 60 },
     ]
     const walkSpeed = 0.3
     let totalCycle = 0
@@ -72,7 +90,7 @@ export function drawScene(ctx, w, h, frame, state, counts) {
       totalCycle += walkFrames + waypoints[i].pause
     }
 
-    const cycleFrame = frame % totalCycle
+    const cycleFrame = idleFrame % totalCycle
     let elapsed = 0
     let lobX = waypoints[0].x
     let lobY = waypoints[0].y
@@ -81,6 +99,7 @@ export function drawScene(ctx, w, h, frame, state, counts) {
       if (cycleFrame < elapsed + seg.pauseFrames) {
         lobX = seg.from.x
         lobY = seg.from.seatY || seg.from.y
+        lobsterAtDesk = !!seg.from.atDesk
         walking = false
         break
       }
@@ -95,6 +114,7 @@ export function drawScene(ctx, w, h, frame, state, counts) {
       elapsed += seg.walkFrames
     }
 
+    drawDesk(ctx, deskX, deskY, midX, state, frame, lobsterAtDesk)
     drawLobster(ctx, lobX, lobY, frame, walking ? 'working' : state)
 
     // Bubbles when paused

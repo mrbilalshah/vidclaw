@@ -7,6 +7,15 @@ export function deriveState(tasks, stateRef) {
   const inProgressIds = new Set(inProgress.map(t => t.id || t._id))
   const prevDoneIds = stateRef.current.seenDoneIds
   const prevInProgressIds = stateRef.current.seenInProgressIds || new Set()
+  // First call: seed seen sets without triggering animations
+  if (!stateRef.current.initialized) {
+    stateRef.current.initialized = true
+    stateRef.current.seenDoneIds = doneIds
+    stateRef.current.seenInProgressIds = inProgressIds
+    if (inProgress.length > 0) return 'working'
+    return 'idle'
+  }
+
   const hasNewDone = [...doneIds].some(id => !prevDoneIds.has(id))
   const hasNewInProgress = [...inProgressIds].some(id => !prevInProgressIds.has(id))
 

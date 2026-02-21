@@ -6,11 +6,14 @@ import { deriveState } from './deriveState'
 
 export default function PixelBotView({ onAddTask }) {
   const canvasRef = useRef(null)
-  const frameRef = useRef(0)
+  const frameRef = useRef(Math.floor(Math.random() * 10000))
   const animRef = useRef(null)
   const lastFrameTime = useRef(0)
   const stateRef = useRef({ seenDoneIds: new Set(), seenInProgressIds: new Set(), celebrateUntil: 0, workingUntil: 0, pendingCelebration: false })
   const countsRef = useRef({ backlog: 0, todo: 0, 'in-progress': 0, done: 0 })
+  const idleStartFrame = useRef(0)
+  const prevBotState = useRef('idle')
+  const botStateRef = useRef('idle')
   const [tasks, setTasks] = useState([])
   const [botState, setBotState] = useState('idle')
 
@@ -18,7 +21,7 @@ export default function PixelBotView({ onAddTask }) {
     try {
       const res = await fetch('/api/tasks')
       const data = await res.json()
-      setTasks(data)
+      setTasks(data || [])
     } catch {}
   }, [])
 
@@ -26,7 +29,10 @@ export default function PixelBotView({ onAddTask }) {
   useSocket('tasks', (newTasks) => { setTasks(newTasks) })
 
   useEffect(() => {
-    setBotState(deriveState(tasks, stateRef))
+    if (tasks.length === 0) return
+    const newState = deriveState(tasks, stateRef)
+    setBotState(newState)
+    botStateRef.current = newState
     countsRef.current = {
       backlog: tasks.filter(t => t.status === 'backlog').length,
       todo: tasks.filter(t => t.status === 'todo').length,
@@ -37,8 +43,11 @@ export default function PixelBotView({ onAddTask }) {
 
   // Re-evaluate state periodically so timed transitions (working→celebrating→idle) fire
   useEffect(() => {
+    if (tasks.length === 0) return
     const interval = setInterval(() => {
-      setBotState(deriveState(tasks, stateRef))
+      const newState = deriveState(tasks, stateRef)
+      setBotState(newState)
+      botStateRef.current = newState
     }, 1000)
     return () => clearInterval(interval)
   }, [tasks])
@@ -48,6 +57,16 @@ export default function PixelBotView({ onAddTask }) {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     let paused = document.hidden
+    const MIN_WIDTH = 1320
+
+    const resize = () => {
+      const container = canvas.parentElement
+      canvas.height = container.clientHeight
+      canvas.width = Math.max(MIN_WIDTH, container.clientWidth)
+    }
+    resize()
+
+    let resuming = false
 
     const animate = (timestamp) => {
       if (paused) return
@@ -58,39 +77,37 @@ export default function PixelBotView({ onAddTask }) {
       frameRef.current = (frameRef.current + 1) % 10000
       const w = canvas.width
       const h = canvas.height
+      if (w === 0 || h === 0) return
       ctx.clearRect(0, 0, w, h)
-      drawScene(ctx, w, h, frameRef.current, botState, countsRef.current)
+      const currentState = botStateRef.current
+      if (!resuming && currentState === 'idle' && prevBotState.current !== 'idle') {
+        idleStartFrame.current = frameRef.current
+      }
+      resuming = false
+      prevBotState.current = currentState
+      const idleFrame = frameRef.current - idleStartFrame.current
+      drawScene(ctx, w, h, frameRef.current, currentState, countsRef.current, idleFrame)
     }
 
     const onVisibility = () => {
       paused = document.hidden
-      if (!paused && !animRef.current) {
+      if (!paused) {
+        resuming = true
+        lastFrameTime.current = 0
         animRef.current = requestAnimationFrame(animate)
       }
     }
 
     document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('resize', resize)
     animRef.current = requestAnimationFrame(animate)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('resize', resize)
       if (animRef.current) cancelAnimationFrame(animRef.current)
       animRef.current = null
     }
-  }, [botState])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const MIN_WIDTH = 1320
-    const resize = () => {
-      const container = canvas.parentElement
-      canvas.height = container.clientHeight
-      canvas.width = Math.max(MIN_WIDTH, container.clientWidth)
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [])
+  }, []) // Run once on mount — reads botStateRef/countsRef for latest values
 
   const label = STATE_LABELS[botState]
   const counts = {
