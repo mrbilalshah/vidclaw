@@ -242,7 +242,9 @@ export function completeTask(req, res) {
     if (hasError) tasks[idx].error = req.body.error;
   }
   writeTasks(tasks);
-  logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError });
+  const resultSnippet = (req.body.result || '').slice(0, 500) || null;
+  const errorSnippet = (req.body.error || '').slice(0, 500) || null;
+  logActivity('bot', 'task_completed', { taskId: req.params.id, title: tasks[idx].title, hasError, result: resultSnippet, error: errorSnippet });
   broadcast('tasks', tasks);
   res.json(tasks[idx]);
 }
@@ -332,7 +334,7 @@ export function getCalendar(req, res) {
         for (const run of runs) {
           const date = isoToDateInTz(run);
           initDay(date);
-          if (!data[date].scheduled.includes(t.title)) data[date].scheduled.push(t.title);
+          if (!data[date].scheduled.find(s => s.id === t.id)) data[date].scheduled.push({ id: t.id, title: t.title });
         }
       } catch {}
       // Also include the immediate next run if not covered
@@ -340,7 +342,7 @@ export function getCalendar(req, res) {
         try {
           const date = isoToDateInTz(new Date(t.scheduledAt).toISOString());
           initDay(date);
-          if (!data[date].scheduled.includes(t.title)) data[date].scheduled.push(t.title);
+          if (!data[date].scheduled.find(s => s.id === t.id)) data[date].scheduled.push({ id: t.id, title: t.title });
         } catch {}
       }
     } else if (t.scheduledAt && t.status !== 'done') {
@@ -348,7 +350,7 @@ export function getCalendar(req, res) {
       try {
         const date = isoToDateInTz(new Date(t.scheduledAt).toISOString());
         initDay(date);
-        data[date].scheduled.push(t.title);
+        data[date].scheduled.push({ id: t.id, title: t.title });
       } catch {}
     }
   }

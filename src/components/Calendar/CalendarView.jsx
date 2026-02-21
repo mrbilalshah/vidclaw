@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, FileText, CheckCircle, Clock, CalendarClock } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, FileText, CheckCircle, Clock, CalendarClock, Trash2, PauseCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTimezone } from '../TimezoneContext'
 import PageSkeleton from '../PageSkeleton'
+import TaskDetailDialog from '../Kanban/TaskDetailDialog'
 
 function LiveClock({ timezone }) {
   const [now, setNow] = useState(new Date())
@@ -25,14 +26,36 @@ function LiveClock({ timezone }) {
 
 export default function CalendarView() {
   const [data, setData] = useState({})
+  const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [current, setCurrent] = useState(new Date())
   const [selected, setSelected] = useState(() => new Date().toLocaleDateString('en-CA'))
+  const [viewTask, setViewTask] = useState(null)
   const { timezone } = useTimezone()
 
-  useEffect(() => {
-    fetch('/api/calendar').then(r => r.json()).then(setData).catch(() => {}).finally(() => setLoading(false))
+  const refresh = useCallback(() => {
+    Promise.all([
+      fetch('/api/calendar').then(r => r.json()),
+      fetch('/api/tasks').then(r => r.json()),
+    ]).then(([cal, tks]) => { setData(cal); setTasks(tks) }).catch(() => {}).finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  async function handleDelete(id) {
+    await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    refresh()
+  }
+
+  async function handleDisableSchedule(id) {
+    await fetch(`/api/tasks/${id}/schedule-toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }) })
+    refresh()
+  }
+
+  function openTask(id) {
+    const task = tasks.find(t => t.id === id)
+    if (task) setViewTask(task)
+  }
 
   const year = current.getFullYear()
   const month = current.getMonth()
@@ -114,7 +137,7 @@ export default function CalendarView() {
         const entries = []
         if (selectedData?.memory) entries.push({ type: 'memory', text: typeof selectedData.memory === 'string' ? selectedData.memory : 'Memory note' })
         selectedData?.tasks?.forEach(t => entries.push({ type: 'task', text: t }))
-        selectedData?.scheduled?.forEach(t => entries.push({ type: 'scheduled', text: t }))
+        selectedData?.scheduled?.forEach(t => entries.push({ type: 'scheduled', text: typeof t === 'string' ? t : t.title, id: typeof t === 'string' ? null : t.id }))
 
         const dateLabel = new Date(selected + 'T00:00:00').toLocaleDateString('en-US', {
           weekday: 'long', month: 'long', day: 'numeric'
@@ -133,12 +156,36 @@ export default function CalendarView() {
                 {entries.map((entry, i) => {
                   const EntryIcon = Icon[entry.type]
                   return (
-                    <div key={i} className="flex items-start gap-2">
+                    <div key={i} className="flex items-start gap-2 group">
                       <div className={cn('w-2 h-2 rounded-full shrink-0 mt-1.5', dotColor[entry.type])} />
-                      <div className={cn('flex items-start gap-2 text-sm', textColor[entry.type])}>
+                      <div className={cn('flex items-start gap-2 text-sm flex-1 min-w-0', textColor[entry.type])}>
                         <EntryIcon size={14} className={cn('shrink-0 mt-0.5', entry.type === 'task' ? 'text-green-400' : undefined)} />
-                        <span>{entry.type === 'scheduled' ? `Scheduled: ${entry.text}` : entry.text}</span>
+                        {entry.type === 'scheduled' && entry.id ? (
+                          <button onClick={() => openTask(entry.id)} className="text-left hover:underline truncate">
+                            Scheduled: {entry.text}
+                          </button>
+                        ) : (
+                          <span className="truncate">{entry.type === 'scheduled' ? `Scheduled: ${entry.text}` : entry.text}</span>
+                        )}
                       </div>
+                      {entry.type === 'scheduled' && entry.id && (
+                        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleDisableSchedule(entry.id)}
+                            title="Pause schedule"
+                            className="p-1 rounded hover:bg-orange-500/20 text-orange-400/60 hover:text-orange-400 transition-colors"
+                          >
+                            <PauseCircle size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(entry.id)}
+                            title="Delete task"
+                            className="p-1 rounded hover:bg-red-500/20 text-red-400/60 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -147,6 +194,12 @@ export default function CalendarView() {
           </div>
         )
       })()}
+
+      <TaskDetailDialog
+        open={!!viewTask}
+        onClose={() => setViewTask(null)}
+        task={viewTask}
+      />
     </div>
   )
 }

@@ -36,42 +36,46 @@ function formatTimeAgo(iso) {
 }
 
 const ACTION_LABELS = {
-  task_created: 'Created',
-  task_updated: 'Updated',
-  task_run: 'Started',
-  task_pickup: 'Picked up',
-  task_completed: 'Completed',
-  task_deleted: 'Deleted',
-  task_status_check: 'Checked',
+  task_created: 'Created task',
+  task_updated: 'Updated task',
+  task_run: 'Started task',
+  task_pickup: 'Picked up task',
+  task_completed: 'Completed task',
+  task_deleted: 'Deleted task',
+  task_status_check: 'Checked status',
   task_timeout: 'Timed out',
-  task_archived: 'Archived',
+  task_archived: 'Archived task',
+  schedule_toggled: 'Toggled schedule',
 }
 
 const STATUS_LABELS = {
   todo: 'To Do', 'in-progress': 'In Progress', review: 'Review', done: 'Done', blocked: 'Blocked',
 }
 
-function truncateTitle(title, max = 40) {
-  if (!title || title.length <= max) return title
-  return title.slice(0, max - 1) + '…'
-}
-
 function describeActivity(a) {
   const d = a.details || {}
-  const title = truncateTitle(d.title)
   const label = ACTION_LABELS[a.action] || a.action
 
   if (a.action === 'task_updated' && d.newStatus) {
-    return { verb: `Moved to ${STATUS_LABELS[d.newStatus] || d.newStatus}`, title }
+    return { verb: `Moved to ${STATUS_LABELS[d.newStatus] || d.newStatus}` }
   }
   if (a.action === 'task_updated' && d.newPriority) {
-    return { verb: `Set priority to ${d.newPriority}`, title }
+    return { verb: `Set priority to ${d.newPriority}` }
   }
   if (a.action === 'task_updated' && d.changes?.length) {
     const fields = d.changes.filter(c => c !== '_actor').join(', ')
-    return { verb: `Updated ${fields} on`, title }
+    return { verb: `Updated ${fields}` }
   }
-  return { verb: label, title }
+  if (a.action === 'schedule_toggled') {
+    return { verb: d.enabled ? 'Enabled schedule' : 'Paused schedule' }
+  }
+  if (a.action === 'task_status_check' && d.status) {
+    return { verb: `Status: ${d.status}`, detail: d.message }
+  }
+  if (a.action === 'task_completed') {
+    return { verb: label, detail: d.error || d.result }
+  }
+  return { verb: label }
 }
 
 function collapseActivities(activities) {
@@ -79,8 +83,8 @@ function collapseActivities(activities) {
   const result = []
   for (const a of activities) {
     const prev = result[result.length - 1]
-    // Deduplicate consecutive identical entries
-    if (prev && !prev.grouped &&
+    // Deduplicate consecutive identical entries (but not ones with details to show)
+    if (prev && !prev.grouped && !prev.details?.result && !prev.details?.error && !prev.details?.message &&
         prev.actor === a.actor && prev.action === a.action &&
         prev.details?.taskId === a.details?.taskId) {
       prev.count = (prev.count || 1) + 1
@@ -132,8 +136,8 @@ function ActivityLog({ taskId }) {
   return (
     <div className="space-y-1 p-1">
       {collapsed.map(a => {
-        const { verb, title } = a.grouped
-          ? { verb: a.groupLabel, title: truncateTitle(a.details?.title) }
+        const { verb, detail } = a.grouped
+          ? { verb: a.groupLabel, detail: a.details?.result || a.details?.error }
           : describeActivity(a)
         return (
           <div key={a.id} className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/50 transition-colors">
@@ -147,10 +151,15 @@ function ActivityLog({ taskId }) {
                 </span>
                 {' '}
                 <span className="text-muted-foreground">{verb}</span>
-                {title && <span className="text-foreground font-medium"> "{title}"</span>}
                 {a.count > 1 && <span className="text-muted-foreground/70 text-[10px] ml-1">×{a.count}</span>}
                 {a.details?.hasError && <span className="text-red-400"> (error)</span>}
               </p>
+              {detail && (
+                <p className={cn(
+                  'text-[11px] mt-0.5 line-clamp-3 whitespace-pre-wrap',
+                  a.details?.hasError || a.details?.error ? 'text-red-400/80' : 'text-foreground/60'
+                )}>{detail}</p>
+              )}
               <p className="text-[10px] text-muted-foreground">{formatTimeAgo(a.timestamp)}</p>
             </div>
           </div>
