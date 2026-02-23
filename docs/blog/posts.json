@@ -1,5 +1,25 @@
 [
   {
+    "slug": "how-to-edit-your-agents-soul",
+    "title": "How to Edit Your Agent's Soul in VidClaw",
+    "date": "2026-02-23",
+    "author": "woocassh",
+    "excerpt": "Learn how to use VidClaw's Soul Editor to shape your OpenClaw agent's personality — from picking a starter template to writing custom instructions and managing version history.",
+    "tags": ["tutorial", "soul-editor", "customization", "agents"],
+    "readingTime": "5 min read",
+    "gradient": "linear-gradient(135deg, #ec4899, #a855f7)"
+  },
+  {
+    "slug": "7-features-that-make-vidclaw-your-ai-command-center",
+    "title": "7 Features That Make VidClaw Your AI Command Center",
+    "date": "2026-02-23",
+    "author": "woocassh",
+    "excerpt": "A deep dive into VidClaw's core features — from the Kanban board and real-time usage tracking to the Soul Editor and file browser. See what makes it the best way to manage your OpenClaw agent.",
+    "tags": ["features", "overview", "dashboard", "self-hosted"],
+    "readingTime": "6 min read",
+    "gradient": "linear-gradient(135deg, #f97316, #fbbf24)"
+  },
+  {
     "slug": "how-to-setup-openclaw",
     "title": "How to Set Up OpenClaw with VidClaw: Complete Guide",
     "date": "2026-02-22",
@@ -7,6 +27,6 @@
     "excerpt": "Step-by-step tutorial for installing OpenClaw on your VPS, connecting VidClaw as your self-hosted dashboard, and creating your first AI agent task.",
     "tags": ["tutorial", "openclaw", "setup", "self-hosted"],
     "readingTime": "8 min read",
-    "image": "/img/og-vidclaw-com.png"
+    "gradient": "linear-gradient(135deg, #6366f1, #8b5cf6)"
   }
 ]
