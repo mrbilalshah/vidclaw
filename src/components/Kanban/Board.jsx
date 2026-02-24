@@ -239,12 +239,12 @@ export default function Board({ visible = true }) {
   return (
     <div className="flex flex-col h-full">
       {/* View Toggle */}
-      <div className="flex items-center gap-1 mb-3 bg-zinc-900 rounded-lg p-1 self-start border border-zinc-800">
+      <div className="flex items-center gap-1 mb-3 bg-card rounded-lg p-1 self-start border border-border">
         <button
           onClick={() => setView('kanban')}
           aria-pressed={view === 'kanban'}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            view === 'kanban' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'
+            view === 'kanban' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           📋 Kanban
@@ -253,7 +253,7 @@ export default function Board({ visible = true }) {
           onClick={() => setView('pixelbot')}
           aria-pressed={view === 'pixelbot'}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            view === 'pixelbot' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'
+            view === 'pixelbot' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           🤖 Pixel Bot

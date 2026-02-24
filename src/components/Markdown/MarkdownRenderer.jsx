@@ -71,7 +71,7 @@ export default function MarkdownRenderer({
         </pre>
       ) : (
         <div className={cn(
-          'prose prose-invert max-w-none p-3 rounded-lg overflow-auto',
+          'prose dark:prose-invert max-w-none p-3 rounded-lg overflow-auto',
           sizeClasses[size],
           'prose-strong:text-foreground prose-em:text-foreground/90',
           'prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline',

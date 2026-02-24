@@ -19,7 +19,7 @@ export default function FilePreview({ path, content }) {
 
   if (isMarkdown) {
     return (
-      <div className="p-4 prose prose-invert prose-sm max-w-none">
+      <div className="p-4 prose dark:prose-invert prose-sm max-w-none">
         <ReactMarkdown
           components={{
             code({ node, inline, className, children, ...props }) {
@@ -49,5 +49,5 @@ export default function FilePreview({ path, content }) {
     )
   }
 
-  return <pre className="p-4 text-sm whitespace-pre-wrap font-mono">{content}</pre>
+  return <pre className="p-4 text-sm whitespace-pre-wrap font-mono text-foreground">{content}</pre>
 }

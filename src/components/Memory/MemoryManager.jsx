@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Brain, FileText, Save, Check, Clock, Activity, ChevronRight, ChevronDown, RefreshCw, AlertTriangle, CheckCircle, Timer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PageSkeleton from '../PageSkeleton'
+import CodeEditor from '../CodeEditor'
 
 function timeAgo(ts) {
   if (!ts) return 'never'
@@ -45,6 +46,7 @@ function HealthBadge({ health }) {
 function MemoryFilesPanel() {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
+  const [fileLoading, setFileLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [content, setContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
@@ -65,13 +67,16 @@ function MemoryFilesPanel() {
   }, [])
 
   const loadFile = useCallback(async (filePath) => {
+    setFileLoading(true)
     try {
       const r = await fetch(`/api/memory/file?path=${encodeURIComponent(filePath)}`)
       const d = await r.json()
       setContent(d.content || '')
       setSavedContent(d.content || '')
       setLastModified(d.lastModified)
-    } catch {}
+    } catch {} finally {
+      setFileLoading(false)
+    }
   }, [])
 
   useEffect(() => { loadFiles() }, [loadFiles])
@@ -209,12 +214,12 @@ function MemoryFilesPanel() {
                 {saving ? 'Saving…' : saved ? 'Saved' : 'Save'}
               </button>
             </div>
-            <textarea
+            <CodeEditor
               ref={textareaRef}
               value={content}
               onChange={e => setContent(e.target.value)}
-              className="flex-1 w-full bg-card border border-border rounded-md p-3 text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-              spellCheck={false}
+              loading={fileLoading}
+              className="flex-1 w-full rounded-md p-3"
             />
           </>
         ) : (

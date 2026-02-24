@@ -132,9 +132,9 @@ export default function PixelBotView({ onAddTask, visible = true }) {
   return (
     <div className="flex flex-col h-full gap-3">
       {/* Status bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 rounded-lg border border-zinc-800">
+      <div className="flex items-center justify-between px-4 py-2 bg-card rounded-lg border border-border">
         <span className={`text-sm font-medium ${label.color}`}>{label.text}</span>
-        <div className="flex items-center gap-4 text-xs text-zinc-500">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span>{counts.backlog} backlog</span>
           <span>{counts.todo} todo</span>
           <span className="text-amber-500">{counts['in-progress']} active</span>
@@ -143,7 +143,7 @@ export default function PixelBotView({ onAddTask, visible = true }) {
           {onAddTask && (
             <button
               onClick={onAddTask}
-              className="ml-2 px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors"
+              className="ml-2 px-3 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-medium transition-colors"
             >
               + Add Task
             </button>
@@ -152,7 +152,7 @@ export default function PixelBotView({ onAddTask, visible = true }) {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 rounded-lg overflow-x-auto overflow-y-hidden border border-zinc-800 bg-[#0c0a09] relative" style={{ imageRendering: 'pixelated' }}>
+      <div className="flex-1 rounded-lg overflow-x-auto overflow-y-hidden border border-border bg-black relative" style={{ imageRendering: 'pixelated' }}>
         <canvas ref={canvasRef} className="h-full" />
       </div>
     </div>

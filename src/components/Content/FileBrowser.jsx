@@ -4,6 +4,7 @@ import FilePreview from './FilePreview'
 import { cn } from '@/lib/utils'
 import { useNav } from '@/hooks/useNav'
 import PageSkeleton from '../PageSkeleton'
+import CodeEditor from '../CodeEditor'
 
 const SORT_OPTIONS = [
   { value: 'name-asc', label: 'Name A→Z' },
@@ -171,6 +172,7 @@ export default function FileBrowser() {
       setSaveStatus('')
     } else {
       setPreview(entry.path)
+      setFileContent(null)
       setEditing(false)
       setSaveStatus('')
       fetchFileContent(entry.path)
@@ -358,14 +360,13 @@ export default function FileBrowser() {
           </div>
           <div className="flex-1 overflow-auto">
             {editing ? (
-              <textarea
+              <CodeEditor
                 value={editContent}
                 onChange={handleEditChange}
-                className="w-full h-full p-4 bg-transparent text-sm font-mono resize-none outline-none"
-                spellCheck={false}
+                className="w-full h-full border-0 rounded-none"
               />
             ) : fileContent === null ? (
-              <div className="p-4 text-sm text-muted-foreground">Loading...</div>
+              <CodeEditor loading className="flex-1 border-0 rounded-none" />
             ) : (
               <FilePreview path={preview} content={fileContent} />
             )}

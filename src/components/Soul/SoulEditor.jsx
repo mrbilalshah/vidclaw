@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Save, RotateCcw, Check, Clock, FileText, Sparkles, History, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PageSkeleton from '../PageSkeleton'
+import CodeEditor from '../CodeEditor'
 
 const FILE_TABS = [
   { name: 'SOUL.md', label: 'Soul' },
@@ -21,6 +22,7 @@ function timeAgo(ts) {
 
 export default function SoulEditor() {
   const [loading, setLoading] = useState(true)
+  const [fileLoading, setFileLoading] = useState(false)
   const [activeFile, setActiveFile] = useState('SOUL.md')
   const [content, setContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
@@ -37,6 +39,7 @@ export default function SoulEditor() {
   const isSoul = activeFile === 'SOUL.md'
 
   const loadFile = useCallback(async (name) => {
+    setFileLoading(true)
     try {
       const url = name === 'SOUL.md' ? '/api/soul' : `/api/workspace-file?name=${name}`
       const r = await fetch(url)
@@ -46,6 +49,7 @@ export default function SoulEditor() {
       setLastModified(d.lastModified)
     } catch {} finally {
       setLoading(false)
+      setFileLoading(false)
     }
   }, [])
 
@@ -128,14 +132,16 @@ export default function SoulEditor() {
         {/* Editor */}
         <div className="flex-1 flex flex-col min-w-0 min-h-[300px]">
           <div className="flex-1 relative">
-            <textarea ref={textareaRef} value={previewContent ?? content}
+            <CodeEditor
+              ref={textareaRef}
+              value={previewContent ?? content}
               onChange={e => { setPreviewContent(null); setContent(e.target.value) }}
               onKeyDown={handleKeyDown}
               readOnly={previewContent !== null}
-              className={cn('w-full h-full resize-none bg-[#1a1a2e] border border-border rounded-lg p-4 text-sm font-mono leading-relaxed text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50',
-                previewContent !== null && 'opacity-70')}
-              spellCheck={false} />
-            {previewContent !== null && (
+              loading={fileLoading}
+              className={cn('w-full h-full leading-relaxed', previewContent !== null && 'opacity-70')}
+            />
+            {!fileLoading && previewContent !== null && (
               <div className="absolute top-2 right-2 bg-yellow-500/20 text-yellow-400 text-xs px-2 py-1 rounded">
                 Preview — click editor to dismiss
               </div>
