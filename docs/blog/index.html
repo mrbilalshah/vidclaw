@@ -30,7 +30,9 @@
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    nav { display: flex; align-items: center; justify-content: space-between; max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; }
+    nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem; gap: 0.75rem; }
+    .ph-badge { display: flex; align-items: center; }
+    .ph-badge img { border-radius: 4px; }
     nav .brand { font-weight: 800; font-size: 1.2rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
     nav .brand:hover { text-decoration: none; color: var(--accent); }
     nav .nav-links { display: flex; gap: 1.5rem; font-size: 0.95rem; }
@@ -69,6 +71,9 @@
       <a href="/blog" class="active">Blog</a>
       <a href="/changelog">Changelog</a>
       <a href="https://github.com/madrzak/vidclaw">GitHub</a>
+    </div>
+    <div class="ph-badge">
+      <a href="https://www.producthunt.com/products/vidclaw?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-vidclaw" target="_blank" rel="noopener noreferrer"><img alt="VidClaw on Product Hunt" width="150" height="32" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1080264&amp;theme=dark&amp;t=1771254815882" style="display:block;"></a>
     </div>
   </nav>
 
