@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Clock, Globe, Save, Check, Loader2, Search, ChevronDown, Package, Zap, Layers } from 'lucide-react'
+import { Clock, Globe, Save, Check, Loader2, Search, ChevronDown, Package, Zap, Layers, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTimezone } from '../TimezoneContext'
 import PageSkeleton from '../PageSkeleton'
@@ -102,6 +102,74 @@ function TimezoneCombobox({ value, onChange }) {
   )
 }
 
+function DirCombobox({ value, onChange, options }) {
+  const [open, setOpen] = useState(false)
+  const listRef = useRef(null)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    if (open && listRef.current) {
+      const selected = listRef.current.querySelector('[data-selected="true"]')
+      if (selected) selected.scrollIntoView({ block: 'nearest' })
+    }
+  }, [open])
+
+  const handleSelect = (dir) => {
+    onChange(dir)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground hover:border-primary/50 transition-colors"
+      >
+        <span>{value || '/ (workspace root)'}</span>
+        <ChevronDown size={14} className={cn('text-muted-foreground transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-card shadow-lg">
+          <ul ref={listRef} className="max-h-48 overflow-auto py-1">
+            <li
+              data-selected={value === ''}
+              onClick={() => handleSelect('')}
+              className={cn(
+                'px-3 py-1.5 text-sm cursor-pointer transition-colors',
+                value === '' ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-accent'
+              )}
+            >
+              / (workspace root)
+            </li>
+            {options.map(dir => (
+              <li
+                key={dir}
+                data-selected={dir === value}
+                onClick={() => handleSelect(dir)}
+                className={cn(
+                  'px-3 py-1.5 text-sm cursor-pointer transition-colors',
+                  dir === value ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-accent'
+                )}
+              >
+                {dir}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [heartbeat, setHeartbeat] = useState('30m')
   const [savedHeartbeat, setSavedHeartbeat] = useState('30m')
@@ -109,6 +177,8 @@ export default function SettingsPage() {
   const [savedTimezone, setSavedTimezone] = useState('UTC')
   const [maxConcurrent, setMaxConcurrent] = useState(1)
   const [savedMaxConcurrent, setSavedMaxConcurrent] = useState(1)
+  const [defaultFilePath, setDefaultFilePath] = useState('content')
+  const [savedDefaultFilePath, setSavedDefaultFilePath] = useState('content')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -121,13 +191,14 @@ export default function SettingsPage() {
   const [updating, setUpdating] = useState(false)
   const [updateResult, setUpdateResult] = useState(null)
 
+  const [topDirs, setTopDirs] = useState([])
   const [vidclawInfo, setVidclawInfo] = useState(null)
   const [vidclawLoading, setVidclawLoading] = useState(true)
   const [vidclawUpdating, setVidclawUpdating] = useState(false)
   const [vidclawUpdateResult, setVidclawUpdateResult] = useState(null)
   const [refreshCountdown, setRefreshCountdown] = useState(null)
 
-  const isDirty = heartbeat !== savedHeartbeat || timezone !== savedTimezone || maxConcurrent !== savedMaxConcurrent
+  const isDirty = heartbeat !== savedHeartbeat || timezone !== savedTimezone || maxConcurrent !== savedMaxConcurrent || defaultFilePath !== savedDefaultFilePath
 
   useEffect(() => {
     fetch('/api/settings')
@@ -141,9 +212,16 @@ export default function SettingsPage() {
         const mc = d.maxConcurrent || 1
         setMaxConcurrent(mc)
         setSavedMaxConcurrent(mc)
+        const dfp = d.defaultFilePath || 'content'
+        setDefaultFilePath(dfp)
+        setSavedDefaultFilePath(dfp)
         setLoading(false)
       })
       .catch(() => setLoading(false))
+    fetch('/api/files?path=')
+      .then(r => r.json())
+      .then(entries => setTopDirs(entries.filter(e => e.isDirectory).map(e => e.name)))
+      .catch(() => {})
     fetch('/api/vidclaw/version')
       .then(r => r.json())
       .then(d => { setVidclawInfo(d); setVidclawLoading(false) })
@@ -209,7 +287,7 @@ export default function SettingsPage() {
       const r = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ heartbeatEvery: heartbeat, timezone, maxConcurrent }),
+        body: JSON.stringify({ heartbeatEvery: heartbeat, timezone, maxConcurrent, defaultFilePath }),
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
@@ -219,6 +297,7 @@ export default function SettingsPage() {
       setSavedHeartbeat(heartbeat)
       setSavedTimezone(timezone)
       setSavedMaxConcurrent(maxConcurrent)
+      setSavedDefaultFilePath(defaultFilePath)
       setGlobalTimezone(timezone)
       setSaved(true)
       setRestarted(!!data.restarted)
@@ -237,7 +316,7 @@ export default function SettingsPage() {
 {/* Heartbeat Section */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Clock size={16} className="text-orange-400" />
+          <Clock size={16} className="text-muted-foreground" />
           <h3 className="font-medium text-sm">Heartbeat Frequency</h3>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -264,7 +343,7 @@ export default function SettingsPage() {
       {/* Timezone Section */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Globe size={16} className="text-blue-400" />
+          <Globe size={16} className="text-muted-foreground" />
           <h3 className="font-medium text-sm">Timezone</h3>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -276,7 +355,7 @@ export default function SettingsPage() {
       {/* Concurrent Tasks */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Layers size={16} className="text-purple-400" />
+          <Layers size={16} className="text-muted-foreground" />
           <h3 className="font-medium text-sm">Concurrent Tasks</h3>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -290,8 +369,8 @@ export default function SettingsPage() {
               className={cn(
                 'w-9 h-9 rounded-md text-sm font-medium border transition-colors',
                 maxConcurrent === n
-                  ? 'border-purple-500 bg-purple-500/10 text-purple-400'
-                  : 'border-border text-muted-foreground hover:border-purple-500/50 hover:text-foreground'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
               )}
             >
               {n}
@@ -300,10 +379,22 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Default File Path */}
+      <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <FolderOpen size={16} className="text-muted-foreground" />
+          <h3 className="font-medium text-sm">Default File Browser Path</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          The directory to open when navigating to the Files page.
+        </p>
+        <DirCombobox value={defaultFilePath} onChange={setDefaultFilePath} options={topDirs} />
+      </div>
+
       {/* OpenClaw Version */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Package size={16} className="text-green-400" />
+          <Package size={16} className="text-muted-foreground" />
           <h3 className="font-medium text-sm">OpenClaw Version</h3>
         </div>
         {!versionInfo ? (
@@ -360,7 +451,7 @@ export default function SettingsPage() {
       {/* VidClaw Version */}
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Zap size={16} className="text-orange-400" />
+          <Zap size={16} className="text-muted-foreground" />
           <h3 className="font-medium text-sm">VidClaw Version</h3>
         </div>
         {vidclawLoading ? (

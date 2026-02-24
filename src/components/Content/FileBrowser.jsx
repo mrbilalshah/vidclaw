@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { Folder, File, ChevronRight, ArrowLeft, Download, Eye, Pencil, Search, X, Trash2, ArrowUpDown, FileText, FileImage, FileVideo, FileAudio, FileCode, FileArchive } from 'lucide-react'
+import { Folder, File, ChevronRight, ArrowLeft, Download, Eye, Pencil, Search, X, Trash2, ArrowUpDown, FileText, FileImage, FileVideo, FileAudio, FileCode, FileArchive, Loader2, RefreshCw } from 'lucide-react'
 import FilePreview from './FilePreview'
 import { cn } from '@/lib/utils'
 import { useNav } from '@/hooks/useNav'
@@ -85,6 +85,7 @@ export default function FileBrowser() {
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
+  const [initialLoad, setInitialLoad] = useState(true)
   const [preview, setPreview] = useState(null)
   const [sortBy, setSortBy] = useState('name-asc')
   const [fuzzyFilter, setFuzzyFilter] = useState('')
@@ -93,6 +94,7 @@ export default function FileBrowser() {
   const [editing, setEditing] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
   const [ctxMenu, setCtxMenu] = useState(null)
+  const [lastFetched, setLastFetched] = useState(null)
   const saveTimerRef = useRef(null)
 
   useEffect(() => {
@@ -102,16 +104,38 @@ export default function FileBrowser() {
       parts.pop()
       setCurrentPath(parts.join('/'))
       setPreview(data.openFile)
+    } else {
+      // Load default file path from settings
+      fetch('/api/settings')
+        .then(r => r.json())
+        .then(d => {
+          if (d.defaultFilePath) setCurrentPath(d.defaultFilePath)
+        })
+        .catch(() => {})
     }
   }, [])
 
-  useEffect(() => {
-    fetch(`/api/files?path=${encodeURIComponent(currentPath)}`)
+  const fetchEntries = useCallback((dir) => {
+    setLoading(true)
+    fetch(`/api/files?path=${encodeURIComponent(dir)}`)
       .then(r => r.json())
       .then(setEntries)
       .catch(() => setEntries([]))
-      .finally(() => setLoading(false))
-  }, [currentPath])
+      .finally(() => { setLoading(false); setInitialLoad(false); setLastFetched(new Date()) })
+  }, [])
+
+  useEffect(() => {
+    fetchEntries(currentPath)
+  }, [currentPath, fetchEntries])
+
+  // Refetch when tab regains visibility (prevents stale file lists)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchEntries(currentPath)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [currentPath, fetchEntries])
 
   // Close context menu on click anywhere
   useEffect(() => {
@@ -237,7 +261,7 @@ export default function FileBrowser() {
 
   const breadcrumbs = currentPath ? currentPath.split('/') : []
 
-  if (loading) return <PageSkeleton variant="files" />
+  if (initialLoad) return <PageSkeleton variant="files" />
 
   return (
     <div className="flex flex-col md:flex-row gap-4 h-full">
@@ -260,7 +284,20 @@ export default function FileBrowser() {
               </button>
             </React.Fragment>
           ))}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-2">
+            {lastFetched && (
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                {formatDate(lastFetched.toISOString())}
+              </span>
+            )}
+            <button
+              onClick={() => fetchEntries(currentPath)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <span className="text-border">|</span>
             <ArrowUpDown size={14} className="text-muted-foreground" />
             <select
               value={sortBy}
@@ -292,46 +329,54 @@ export default function FileBrowser() {
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-border">
-          {sortedAndFiltered.map(entry => (
-            <div
-              key={entry.path}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 hover:bg-accent/50 cursor-pointer transition-colors group',
-                preview === entry.path && 'bg-accent/50'
-              )}
-              onClick={() => navigate(entry)}
-              onContextMenu={e => handleContextMenu(e, entry)}
-            >
-              {entry.isDirectory ? (
-                <Folder size={16} className="text-amber-400 shrink-0" />
-              ) : (
-                getFileIcon(entry.name)
-              )}
-              <span className="text-sm flex-1 truncate">{entry.name}</span>
-              <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap">
-                {entry.mtime ? formatDate(entry.mtime) : ''}
-              </span>
-              {!entry.isDirectory && (
-                <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap w-16 text-right">
-                  {formatSize(entry.size || 0)}
-                </span>
-              )}
-              {entry.isDirectory && <span className="w-16 hidden sm:inline" />}
-              {!entry.isDirectory && (
-                <a
-                  href={`/api/files/download?path=${encodeURIComponent(entry.path)}`}
-                  onClick={e => e.stopPropagation()}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-all"
+          {loading ? (
+            <div className="flex items-center justify-center h-full py-12">
+              <Loader2 size={20} className="animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              {sortedAndFiltered.map(entry => (
+                <div
+                  key={entry.path}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 hover:bg-accent/50 cursor-pointer transition-colors group',
+                    preview === entry.path && 'bg-accent/50'
+                  )}
+                  onClick={() => navigate(entry)}
+                  onContextMenu={e => handleContextMenu(e, entry)}
                 >
-                  <Download size={14} />
-                </a>
+                  {entry.isDirectory ? (
+                    <Folder size={16} className="text-amber-400 shrink-0" />
+                  ) : (
+                    getFileIcon(entry.name)
+                  )}
+                  <span className="text-sm flex-1 truncate">{entry.name}</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap">
+                    {entry.mtime ? formatDate(entry.mtime) : ''}
+                  </span>
+                  {!entry.isDirectory && (
+                    <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap w-16 text-right">
+                      {formatSize(entry.size || 0)}
+                    </span>
+                  )}
+                  {entry.isDirectory && <span className="w-16 hidden sm:inline" />}
+                  {!entry.isDirectory && (
+                    <a
+                      href={`/api/files/download?path=${encodeURIComponent(entry.path)}`}
+                      onClick={e => e.stopPropagation()}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-all"
+                    >
+                      <Download size={14} />
+                    </a>
+                  )}
+                </div>
+              ))}
+              {sortedAndFiltered.length === 0 && (
+                <div className="p-4 text-sm text-muted-foreground text-center">
+                  {fuzzyFilter ? 'No matches' : 'Empty directory'}
+                </div>
               )}
-            </div>
-          ))}
-          {sortedAndFiltered.length === 0 && (
-            <div className="p-4 text-sm text-muted-foreground text-center">
-              {fuzzyFilter ? 'No matches' : 'Empty directory'}
-            </div>
+            </>
           )}
         </div>
       </div>

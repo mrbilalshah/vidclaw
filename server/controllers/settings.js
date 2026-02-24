@@ -11,7 +11,8 @@ export function getSettings(req, res) {
     const settings = readSettings();
     const timezone = settings.timezone || 'UTC';
     const maxConcurrent = settings.maxConcurrent || 1;
-    res.json({ heartbeatEvery, timezone, maxConcurrent });
+    const defaultFilePath = settings.defaultFilePath || 'content';
+    res.json({ heartbeatEvery, timezone, maxConcurrent, defaultFilePath });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -19,7 +20,7 @@ export function getSettings(req, res) {
 
 export async function postSettings(req, res) {
   try {
-    const { heartbeatEvery, timezone, maxConcurrent } = req.body;
+    const { heartbeatEvery, timezone, maxConcurrent, defaultFilePath } = req.body;
 
     const allowedHeartbeats = ['5m', '10m', '15m', '30m', '1h'];
     if (heartbeatEvery && !allowedHeartbeats.includes(heartbeatEvery)) {
@@ -54,22 +55,32 @@ export async function postSettings(req, res) {
       }
     }
 
-    // timezone and maxConcurrent go into VidClaw's own settings file
+    // Validate defaultFilePath (no path traversal)
+    if (defaultFilePath !== undefined) {
+      if (typeof defaultFilePath !== 'string' || defaultFilePath.includes('..')) {
+        return res.status(400).json({ error: 'Invalid defaultFilePath' });
+      }
+    }
+
+    // timezone, maxConcurrent, defaultFilePath go into VidClaw's own settings file
     const settings = readSettings();
     if (timezone) settings.timezone = timezone;
     if (maxConcurrent !== undefined) settings.maxConcurrent = parseInt(maxConcurrent, 10);
+    if (defaultFilePath !== undefined) settings.defaultFilePath = defaultFilePath;
     writeSettings(settings);
 
     const details = {};
     if (heartbeatEvery) details.heartbeatEvery = heartbeatEvery;
     if (timezone) details.timezone = timezone;
     if (maxConcurrent !== undefined) details.maxConcurrent = parseInt(maxConcurrent, 10);
+    if (defaultFilePath !== undefined) details.defaultFilePath = defaultFilePath;
     logActivity('dashboard', 'settings_updated', details);
 
     broadcast('settings', {
       heartbeatEvery: heartbeatEvery || undefined,
       timezone: settings.timezone || 'UTC',
       maxConcurrent: settings.maxConcurrent || 1,
+      defaultFilePath: settings.defaultFilePath || 'content',
     });
 
     if (heartbeatChanged) {
