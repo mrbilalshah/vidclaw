@@ -75,7 +75,7 @@ function uniqueExistingDirs(candidates) {
 
 const parsedPort = Number.parseInt(process.env.PORT || '', 10);
 export const PORT = Number.isInteger(parsedPort) && parsedPort > 0 ? parsedPort : 3333;
-export const HOST = process.env.HOST || '127.0.0.1';
+export const HOST = process.env.HOST || (process.env.RAILWAY_ENVIRONMENT ? '0.0.0.0' : '127.0.0.1');
 
 export const OPENCLAW_DIR = normalizeDir(process.env.OPENCLAW_DIR || path.join(HOME, '.openclaw'));
 export const WORKSPACE = path.join(OPENCLAW_DIR, 'workspace');
