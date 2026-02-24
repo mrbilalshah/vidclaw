@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Install VidClaw — Self-Hosted OpenClaw Dashboard Setup Guide</title>
-  <meta name="description" content="Install VidClaw, the self-hosted AI dashboard for OpenClaw agent management. Clone, run setup.sh, and access via SSH tunnel or Tailscale in under a minute.">
+  <meta name="description" content="Install VidClaw, the self-hosted AI dashboard for OpenClaw agent management. One command installs Node.js, Tailscale, and VidClaw. Access via SSH tunnel or Tailscale in under a minute.">
   <link rel="canonical" href="https://vidclaw.com/install">
   <script async src="https://plausible.io/js/pa-GKT997euCDfQROHoFG713.js"></script>
   <script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>
@@ -85,39 +85,18 @@
 
     <h2>Prerequisites</h2>
     <ul>
-      <li><strong>Node.js 18+</strong> installed on your server</li>
       <li>A running <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener">OpenClaw</a> instance</li>
       <li>SSH access to your server or <a href="https://tailscale.com" target="_blank" rel="noopener">Tailscale</a> for remote access</li>
     </ul>
 
     <h2>Quick Install</h2>
-    <div class="steps">
-      <div class="step">
-        <h3>Clone the repository</h3>
-        <p>Clone VidClaw into your OpenClaw workspace:</p>
-        <div class="code-block">
-          <span class="cmd">cd</span> ~/.openclaw/workspace<br>
-          <span class="cmd">git clone</span> https://github.com/madrzak/vidclaw.git dashboard
-        </div>
-      </div>
-
-      <div class="step">
-        <h3>Run the setup script</h3>
-        <p>The setup script installs dependencies, builds the frontend, and registers a service:</p>
-        <div class="code-block">
-          <span class="cmd">cd</span> dashboard<br>
-          <span class="cmd">./setup.sh</span>
-        </div>
-      </div>
-
-      <div class="step">
-        <h3>Access the dashboard</h3>
-        <p>VidClaw binds to <code>localhost:3333</code> for security. Access it from your local machine:</p>
-        <div class="code-block">
-          <span class="cmd">ssh</span> -L 3333:localhost:3333 root@your-server
-        </div>
-        <p>Then open <a href="http://localhost:3333">http://localhost:3333</a> in your browser.</p>
-      </div>
+    <p>One command. Installs Node.js, Tailscale, and VidClaw automatically:</p>
+    <div class="code-block">
+      <span class="cmd">curl</span> -fsSL vidclaw.com/install.sh | <span class="cmd">bash</span>
+    </div>
+    <p>Localhost only? Add <code>--no-tailscale</code>:</p>
+    <div class="code-block">
+      <span class="cmd">curl</span> -fsSL vidclaw.com/install.sh | <span class="cmd">bash</span> -s -- --no-tailscale
     </div>
 
     <h2>Setup Options</h2>
@@ -145,14 +124,15 @@
 
     <h2>Accessing the Dashboard</h2>
     <p>VidClaw only binds to <code>localhost</code> — it is not exposed to the network. Two ways to access it remotely:</p>
+    <h3>Tailscale (default)</h3>
+    <p>The installer enables <a href="https://tailscale.com" target="_blank" rel="noopener">Tailscale Serve</a> by default on port 8443. Open <code>https://your-machine.your-tailnet.ts.net:8443</code> from any device on your tailnet.</p>
+
     <h3>SSH tunnel</h3>
+    <p>If you installed with <code>--no-tailscale</code>, use an SSH tunnel instead:</p>
     <div class="code-block">
       <span class="cmd">ssh</span> -L 3333:localhost:3333 root@your-server
     </div>
     <p>Then open <a href="http://localhost:3333">http://localhost:3333</a> on your local machine.</p>
-
-    <h3>Tailscale</h3>
-    <p>If you ran <code>./setup.sh --tailscale</code>, VidClaw is served over HTTPS on your Tailscale network. Open <code>https://your-machine-name:8443</code> from any device on your tailnet.</p>
 
     <h2>Helper Scripts</h2>
     <p>VidClaw includes helper scripts for day-to-day management:</p>
